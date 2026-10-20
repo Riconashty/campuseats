@@ -1,0 +1,12 @@
+@startuml US#
+
+left to right direction
+
+:User:
+:Student:
+:Vendor:
+
+package "CampusEats" {
+}
+
+@enduml
