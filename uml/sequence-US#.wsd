@@ -6,7 +6,18 @@ left to right direction
 :Student:
 :Vendor:
 
+User --> Student: login
+User --> Vendor: login
+
 package "CampusEats" {
+Student --> (Has reservation)
+Vendor --> (View Revervations)
+(View Revervations) -> (Mark reservations as complete)
+Student --> (Leave Review)
+(Leave Review)..(Store numeric value and text input)
+(Leave Review) .. (Limit text input to 300 characters)
+(Store numeric value and text input) .. (calculate average store rating )
+
 }
 
 @enduml
