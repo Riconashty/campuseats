@@ -36,7 +36,7 @@ class FoodItem {
     item_name
     portions
     description
-    tags
+    Dietary_Restrictions
     pickup_window
 }
 
@@ -48,7 +48,14 @@ class Reservations {
     pickup_time
     reservation_status
 }
+
+class Dietary_Restrictions {
+    restriction_id
+    restriction_name
+}
+
 Store "1" *-- "N" FoodItem : has
 Student "1" *-- "N" Reservations : makes
 Reservations "1" *-- "1" FoodItem : contains
+FoodItem "1" *-- "N" Dietary_Restrictions : contains
 @enduml

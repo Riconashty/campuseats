@@ -1,0 +1,28 @@
+@startuml US10
+
+participant Student
+participant Browser
+participant Model
+participant Database
+
+Student -> Browser : Recieve reserved food item
+Browser -> Model : Notify completed reservation
+Model -> Student : Request feedback
+Student -> Browser : Submit feedback w/ email
+Browser -> Model : Pass feedback and email
+Model -> Database : Check email against existing records
+
+alt email exists
+    Database -> Model : Return existing record
+    Model -> Browser : Notify feedback submission failed
+    Browser -> Student : Notify feedback submission failed
+else email does not exist
+    Database -> Model : Return no record found
+    Model -> Database : Store feedback and email
+    Database -> Model : Return success
+    Model -> Browser : Notify feedback submission successful
+    Browser -> Student : Send thank you message
+end
+
+
+@enduml
