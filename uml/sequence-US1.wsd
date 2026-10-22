@@ -1,0 +1,22 @@
+@startuml US1
+
+participant User
+participant Browser
+participant Model
+participant Database
+
+User -> Browser : Request new account, select role type, submit credentials
+Browser -> Model : Submit registration details
+Model -> Database : Query credentials
+alt credentials exists
+    Database -> Model : Return error (user exists)
+    Model -> User : Display error message, redirect to sign in
+else credentials do not exist
+    Database -> Model : Store new user credentials
+    Model -> User : Display success message, send to main page
+end
+
+
+
+
+@enduml
