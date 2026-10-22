@@ -1,2 +1,117 @@
+# ===============================
+# Bytecode and Compilation
+# ===============================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ===============================
+# Virtual Environments
+# ===============================
 .venv/
-env
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ===============================
+# Secrets and Environment Variables
+# ===============================
+.env
+.env.*
+!.env.example
+!.env.template
+instance/
+*.pem
+*.key
+*.cert
+*.crt
+
+# ===============================
+# Web Framework Storage and Uploads
+# ===============================
+# SQLite databases
+*.sqlite3
+*.sqlite
+*.db
+# Runtime data / dynamic user uploads
+uploads/
+static/uploads/
+media/
+.webassets-cache/
+
+# ===============================
+# Logs and Daemons
+# ===============================
+*.log
+*.pid
+*.seed
+celerybeat-schedule
+celerybeat.pid
+dump.rdb
+
+# ===============================
+# Packaging and Distribution
+# ===============================
+dist/
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ===============================
+# Testing, Coverage, and Linting
+# ===============================
+.tox/
+.nox/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+htmlcov/
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===============================
+# Operating System
+# ===============================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+# Windows
+Thumbs.db
+Desktop.ini
+
+# ===============================
+# IDEs and Editors
+# ===============================
+# PyCharm / JetBrains
+.idea/
+*.iws
+*.iml
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.code-workspace
