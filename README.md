@@ -4,9 +4,7 @@ CampusEats connects campus food vendors that have leftover food with students wh
 
 ---
 
-## Quick Start
-
-Follow these steps to get the project running locally on a fresh machine:
+## How to Run Locally
 
 ### 1. Clone the Repository
 ```bash
@@ -18,15 +16,8 @@ cd campuseats
 ```bash
 python3 -m venv .venv
 ```
-
-- **macOS / Linux:**
-  ```bash
-  source .venv/bin/activate
-  ```
-- **Windows (Command Prompt / PowerShell):**
-  ```cmd
-  .venv\Scripts\activate
-  ```
+- **macOS / Linux:** `source .venv/bin/activate`
+- **Windows:** `.venv\Scripts\activate`
 
 ### 3. Install Dependencies
 ```bash
@@ -41,5 +32,11 @@ cp .env.example .env
 
 ### 5. Run the Application
 ```bash
-python3 run.py
+python run.py
+```
+Open `http://localhost:5000` in your browser.
+
+### 6. Run Tests
+```bash
+python -m unittest discover tests
 ```
