@@ -9,4 +9,53 @@ class User {
     active
 }
 
+class Student {
+    student_id
+}
+
+class Vendor {
+    vendor_id
+    store_id
+}
+
+User <|-- Student
+User <|-- Vendor
+
+Vendor "1" *-- "N" Store : owns
+
+
+class Store {
+    store_id
+    store_name
+    menu
+    reservations
+}
+
+class FoodItem {
+    food_item_id
+    item_name
+    portions
+    description
+    Dietary_Restrictions
+    pickup_window
+}
+
+class Reservations {
+    reservation_id
+    student_id
+    store_id
+    food_item_id
+    pickup_time
+    reservation_status
+}
+
+class Dietary_Restrictions {
+    restriction_id
+    restriction_name
+}
+
+Store "1" *-- "N" FoodItem : has
+Student "1" *-- "N" Reservations : makes
+Reservations "1" *-- "1" FoodItem : contains
+FoodItem "1" *-- "N" Dietary_Restrictions : contains
 @enduml
