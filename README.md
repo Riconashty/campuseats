@@ -1,10 +1,10 @@
-# Overview
+# CampusEats
 
-In this project your Scrum team will build **CampusEats**, a web app for rescuing surplus food on campus, over three one-week sprints. Before Sprint 1 starts, your team scores and prioritizes the Product Backlog and plans which user stories go into which sprint. During the sprints you run Scrum events, track work on a Kanban board, use Git and GitHub with one tagged release per sprint, and deploy the app with Docker Compose and PostgreSQL.
+CampusEats connects campus food vendors that have leftover food with students who want it, reducing food waste and hunger on campus.
 
-# Teams Setup
+---
 
-Teams must have 3 to 5 members, no exceptions. Your team does not need to be the same as in previous project.
+## Quick Start
 
 Each team designates one member as the **Scrum Master** before Sprint 1 begins and records that name in the README. The Scrum Master also writes code, but is additionally responsible for facilitating sprint planning, daily scrums, reviews and retrospectives, making sure meeting notes are recorded in the scrum folder on time. 
 
@@ -141,147 +141,38 @@ Before writing any code, split the backlog across the three sprints and record i
 * Priority: within those limits, higher-ranked stories go earlier.
 * Planned burndown: list the story points remaining at the start and after each planned sprint.
 
-```
-Team capacity (story points per sprint): <your team's capacity>
-
-Justification (one or two sentences: team size, hours available, course load): <justification>
-```
-
-| Sprint | User stories (in order) | Story points planned | Points remaining after sprint | Dependencies checked (Y/N) |
-| --- | --- | --- | --- | --- |
-| Sprint 1 |  |  |  |  |
-| Sprint 2 |  |  |  |  |
-| Sprint 3 |  |  |  |  |
-| **Total** |  |  | — | — |
-
-# Sprint Boards
-
-Track all tasks on a GitHub Projects board, Microsoft Teams pages, or any other tool of your preference. 
-
-* Use at least these columns: To Do, In Progress, In Review, Done.
-* Create one GitHub issue per task, labeled with its user story (for example US4), assigned to its owner, and linked from the pull request that completes it.
-* Move cards as work progresses, not all at once at the end of the sprint.
-* At the end of each sprint, add a screenshot of the board to the **scrum** folder (for example scrum/sprint_#/board.png). 
-
-# Design
-
-Deliver a UML class diagram and at least one sequence diagram, written in PlantUML and committed to the **uml** folder by the end of Sprint 1. Update them in later sprints if the design changes.
-
-* Domain model in **uml/class.wsd**: the main classes (at least User, Vendor or role, Listing, Reservation, and DietaryTag), their key attributes, and their associations with multiplicities. Your database tables should be traceable to this model.
-* Sequence diagram in **uml/sequence-US#.wsd** (for example uml/sequence-US4.wsd): the full flow of one user story from the browser through the Flask route, any service or model classes, and PostgreSQL, including at least one alternative path (for example, not enough portions left). US4 or US7 are good choices because they involve validation and state changes.
-
-# Implementation and Deployment
-
-Implement all seven required user stories in Python with Flask, store all data in PostgreSQL, and deploy the app with Docker Compose (as done in Activity 18).
-
-* Framework: Python 3 and Flask. You may use extensions such as Flask-SQLAlchemy, Flask-Login, and Flask-WTF.
-* Database: PostgreSQL only; SQLite and in-memory storage are not accepted. Create the schema automatically on startup or through migrations (for example Flask-Migrate), so no manual SQL is needed.
-* Configuration: read the database URL and secret key from environment variables. 
-
-Include a **Dockerfile** for the web app and a **docker-compose.yml** with at least two services:
-
-* db: the official postgres image, with a named volume so data survives restarts.
-* web: your Flask app, built from the **Dockerfile**, waiting for db to be ready before starting.
-
-The instructor must be able to run the app with a single command from the repository root:
-
-```
-docker compose up --build
+### 1. Clone the Repository
+```bash
+git clone git@github.com:Riconashty/campuseats.git
+cd campuseats
 ```
 
-and then open it at http://localhost:5000. The README must list this command and include seed accounts (at least one vendor and one student with a few sample listings) created automatically on first start, so the app can be graded without manual data entry.
-
-# Scrum Evidence
-
-Your team is graded on how closely it followed Scrum, so every Scrum event must leave a dated record in the **scrum** folder.
-
-* Daily scrums may be held in person or asynchronously (for example in a team Discord or Teams channel), but each one must be recorded with its date in the sprint file. The Scrum Master records the notes.
-* From Sprint 2 on, the retrospective must say whether the previous sprint's actions were carried out.
-* At the end of the project, complete a burndown chart using the provided template, with three lines: ideal, planned (from your release plan), and actual story points remaining after each sprint. Add one or two sentences explaining any gap between planned and actual.
-
-# Version Control and Releases
-
-Use Git and a single GitHub repository for the team, with a **dev** branch for integration and three tagged releases (v1, v2, v3) on **main**, one per sprint.
-
-* Branches: create **dev** from main at the start of the project. Do each task or story on a topic branch named after it (for example US4-reserve-portions), branched from **dev**.
-* Pull requests: merge topic branches into **dev** through pull requests, each reviewed and approved by a team member other than its author. The history of **dev** must show multiple merges from every team member.
-* Releases: at the end of each sprint, merge **dev** into **main** and tag the merge commit. 
-
-# Testing
-
-Write one automated black box test with Selenium for one user story of your choice, and manually test every other story you implement.
-
-* Automated test: place it in tests/ and make it cover every acceptance criterion of the chosen story, including at least one failure case (for example a duplicate email for US1, or reserving more portions than remain for US4). The test drives the app through the browser against the running Docker Compose deployment; it must not call your Python functions directly. Explain in the README how to run it.
-* Manual tests: for every other implemented story, test each acceptance criterion by hand and record the results in tests/manual-tests.md using this table. Re-test stories from earlier sprints before each release.
-
-| User story | Acceptance criterion | Tester | Date | Result | Notes |
-| --- | --- | --- | --- | --- | --- |
-| US1 | 2: duplicate email rejected | Name | 99/99/26 | passed |  |
-| ... | ... | ... | ... | ... | ... |
-
-# Repository Structure
-
-```
-|__src/
-|____...
-|__uml/
-|____class.wsd
-|____sequence-US#.wsd
-|__scrum/
-|____sprint_#/
-|______board.png
-|______planning.md
-|______daily_scrums.md 
-|______review.md
-|______retrospective.md
-|__tests/
-|____...
-Dockerfile
-docker-compose.yml
-.gitignore
-.venv
-.env
-.env.example
-requirements.txt
-burndown.[xlsx|png]
-README.md
+### 2. Create and Activate Virtual Environment
+```bash
+python3 -m venv .venv
 ```
 
-**.env** and **.venv** must be listed in **.gitignore** and never committed. Create a **.env.example** with placeholder values. 
+- **macOS / Linux:**
+  ```bash
+  source .venv/bin/activate
+  ```
+- **Windows (Command Prompt / PowerShell):**
+  ```cmd
+  .venv\Scripts\activate
+  ```
 
-# Self and team evaluation
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+pip install -e .
+```
 
-Each student must complete a self-evaluation and evaluate their teammates using [this](https://forms.cloud.microsoft/r/ucKeDFVzmf) form. The team's grade is held until every member has submitted.
+### 4. Create Environment Configuration
+```bash
+cp .env.example .env
+```
 
-# Rubric
-
-* +49 for required user stories US1 to US7 (7 points each, all acceptance criteria passing)
-* +5 for design:
-    * +3 class diagram
-    * +2 sequence diagram
-* +5 for PostgreSQL and Docker Compose deployment
-* +5 for testing:
-    * +3 Selenium black box test
-    * +2 manual test evidence
-* +21 for Scrum project management:
-    * +3 backlog scoring and release plan (Sprint 0)
-    * +3 sprint planning with task breakdown and assignments (screenshot evidence)
-    * +3 Kanban board use (screenshot evidence)
-    * +3 daily scrums
-    * +3 sprint reviews
-    * +3 sprint retrospectives
-    * +3 burndown chart (screenshot evidence)
-* +5 for version control:
-    * +2 branches and reviewed pull requests
-    * +3 three tagged releases
-* +10 for self and team evaluation
-
-**Total: 100 points**
-
-**Bonus**
-
-* +3 for each optional story (US8 to US10) that passes all its acceptance criteria, up to +9
-
-**Deductions**
-
-* −3 if a team has no designated Scrum Master recorded in the README
+### 5. Run the Application
+```bash
+python3 run.py
+```
