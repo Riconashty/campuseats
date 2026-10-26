@@ -15,6 +15,7 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     PORT = int(os.environ.get("PORT", 5000))
+    DEBUG = bool(os.environ.get("DEBUG", False))
 
 
 class TestingConfig(Config):
