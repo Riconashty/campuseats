@@ -1,12 +1,58 @@
 @startuml class
 
 class User {
-    email
-    name
-    creation_date
-    role
-    password
-    active
+    email : str
+    name : str
+    creation_date: datetime
+    role : str
+    password_hash : str
+    active : bool
 }
+
+class Student
+class Vendor 
+
+User <|-- Student
+User <|-- Vendor
+
+class Listings {
+    id : int
+    vendor_id : int
+    title : str
+    description : str
+    portion_total : int
+    portion_remaining : int
+    pickup_loaction : str
+    pickup_start : datetime
+    pickup_end : datetime
+    cancelled : bool
+}
+class Reservation {
+    id : int
+    student_id : int
+    listing_id : int
+    portions_reserved: int
+    pickup_code : str
+    status : ReservationStatus
+    created_at : datetime
+}
+
+enum ReservationStatus {
+    ACTIVE
+    PICKED_UP
+    CANCELLED
+    NO_SHOW
+}
+
+class DietaryTag {
+    id : int
+    name : str
+}
+
+Vendor "1" -- "0..*" Listing : posts
+Student "1" *-- "N" Reservation : makes
+Listing "1" -- "0..*" Reservation : reserved through
+Listing "N" -- "N" DietaryTag : tagged with
+Reservation ..> ReservationStatus
 
 @enduml
