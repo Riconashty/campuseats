@@ -1,61 +1,58 @@
 @startuml class
 
 class User {
-    email
-    name
-    creation_date
-    role
-    password
-    active
+    email : str
+    name : str
+    creation_date: datetime
+    role : str
+    password_hash : str
+    active : bool
 }
 
-class Student {
-    student_id
-}
-
-class Vendor {
-    vendor_id
-    store_id
-}
+class Student
+class Vendor 
 
 User <|-- Student
 User <|-- Vendor
 
-Vendor "1" *-- "N" Store : owns
-
-
-class Store {
-    store_id
-    store_name
-    menu
-    reservations
+class Listings {
+    id : int
+    vendor_id : int
+    title : str
+    description : str
+    portion_total : int
+    portion_remaining : int
+    pickup_loaction : str
+    pickup_start : datetime
+    pickup_end : datetime
+    cancelled : bool
+}
+class Reservation {
+    id : int
+    student_id : int
+    listing_id : int
+    portions_reserved: int
+    pickup_code : str
+    status : ReservationStatus
+    created_at : datetime
 }
 
-class FoodItem {
-    food_item_id
-    item_name
-    portions
-    description
-    Dietary_Restrictions
-    pickup_window
+enum ReservationStatus {
+    ACTIVE
+    PICKED_UP
+    CANCELLED
+    NO_SHOW
 }
 
-class Reservations {
-    reservation_id
-    student_id
-    store_id
-    food_item_id
-    pickup_time
-    reservation_status
+class DietaryTag {
+    id : int
+    name : str
 }
 
-class Dietary_Restrictions {
-    restriction_id
-    restriction_name
-}
+Vendor "1" -- "0..*" Listing : posts
+Student "1" *-- "N" Reservation : makes
+Listing "1" -- "0..*" Reservation : reserved through
+Listing "N" -- "N" DietaryTag : tagged with
+Reservation ..> ReservationStatus
 
-Store "1" *-- "N" FoodItem : has
-Student "1" *-- "N" Reservations : makes
-Reservations "1" *-- "1" FoodItem : contains
-FoodItem "1" *-- "N" Dietary_Restrictions : contains
 @enduml
