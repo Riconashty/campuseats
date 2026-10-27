@@ -17,9 +17,4 @@ def create_app(config_class=Config):
         db.session.execute(text("SELECT 1"))  # fails loudly if the DB is unreachable
         db.create_all()  # builds tables for any models (none exist yet)
 
-    @app.get("/health/db")
-    def health_db():
-        db.session.execute(text("SELECT 1"))
-        return {"status": "ok"}
-
     return app
