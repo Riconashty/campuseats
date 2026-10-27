@@ -13,6 +13,7 @@ cd campuseats
 ```
 
 ### 2. Create and Activate Virtual Environment
+- Check `pyproject.toml` for the Python version used.
 ```bash
 python3 -m venv .venv
 ```
