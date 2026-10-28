@@ -231,3 +231,23 @@ class LoginLogoutTestCase(unittest.TestCase):
         # Verify no authenticated session was created
         with self.client.session_transaction() as session:
             self.assertNotIn("_user_id", session)
+
+    # Verify login fails when the email field is empty
+    def test_login_missing_email(self):
+
+        # Attempt login without providing an email
+        response = self.client.post("/login", data={
+            "email": "",
+            "password": "TestPassword123!"
+        })
+
+        # Verify the login page displays a validation error
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b"Please complete all required fields. Missing: Email.",
+            response.data
+        )
+
+        # Verify no authenticated session was created
+        with self.client.session_transaction() as session:
+            self.assertNotIn("_user_id", session)
