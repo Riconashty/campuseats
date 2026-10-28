@@ -9,6 +9,9 @@ if src_path not in sys.path:
 
 from campuseats import create_app
 from campuseats.config import TestingConfig
+from campuseats.routes.role_guards import student_required
+from campuseats.extensions import db
+from campuseats.models.user import User
 
 
 class LoginLogoutTestCase(unittest.TestCase):
@@ -247,6 +250,78 @@ class LoginLogoutTestCase(unittest.TestCase):
             b"Please complete all required fields. Missing: Email.",
             response.data
         )
+
+        # Verify no authenticated session was created
+        with self.client.session_transaction() as session:
+            self.assertNotIn("_user_id", session)
+
+
+    # Verify a student cannot access protected routes after logout
+    def test_protected_route_after_logout(self):
+
+        # Create a temporary protected route for testing
+        @self.app.get("/test/student-only")
+        @student_required
+        def student_only():
+            return "Student Access Granted"
+
+        # Register a student
+        self.client.post("/register", data={
+            "name": "Test Student",
+            "email": "student@example.invalid",
+            "password": "TestPassword123!",
+            "role": "student"
+        })
+
+        # Log in
+        login_response = self.client.post("/login", data={
+            "email": "student@example.invalid",
+            "password": "TestPassword123!"
+        })
+
+        self.assertEqual(login_response.status_code, 302)
+
+        # Verify access is allowed before logout
+        response = self.client.get("/test/student-only")
+        self.assertEqual(response.status_code, 200)
+
+        # Log out
+        self.client.post("/logout")
+
+        # Verify access is denied after logout
+        response = self.client.get("/test/student-only")
+        self.assertEqual(response.status_code, 403)
+
+
+    # Verify users with invalid roles cannot log in
+    def test_login_invalid_role(self):
+
+        # Register a valid student
+        self.client.post("/register", data={
+            "name": "Test Student",
+            "email": "student@example.invalid",
+            "password": "TestPassword123!",
+            "role": "student"
+        })
+
+        # Simulate an invalid role stored in the database
+        with self.app.app_context():
+            user = db.session.execute(
+                db.select(User).filter_by(email="student@example.invalid")
+            ).scalar_one()
+
+            user.role = "admin"
+            db.session.commit()
+
+        # Attempt to log in
+        response = self.client.post("/login", data={
+            "email": "student@example.invalid",
+            "password": "TestPassword123!"
+        })
+
+        # Verify login is rejected
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Unable to log in with this account.", response.data)
 
         # Verify no authenticated session was created
         with self.client.session_transaction() as session:
