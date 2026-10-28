@@ -180,3 +180,34 @@ class LoginLogoutTestCase(unittest.TestCase):
 
         #Verify the logout button isn't displayed
         self.assertIn(b"Register", response.data)
+
+
+    #verify logged in users see logout instead of login or register
+    def test_logged_in_navigation(self):
+
+        # Register and log in a student
+        self.client.post("/register", data={
+            "name": "Test Student",
+            "email": "student@example.invalid",
+            "password": "TestPassword123!",
+            "role": "student"
+        })
+
+        # Log in with valid credentials
+        login_response = self.client.post("/login", data={
+            "email": "student@example.invalid",
+            "password": "TestPassword123!"
+        })
+
+        # Verify login was successful
+        self.assertEqual(login_response.status_code, 302)
+
+        # Visit homepage while logged in
+        response = self.client.get("/")
+
+        # Verify logout button is displayed
+        self.assertIn(b'action="/logout"', response.data)
+
+        #verify login and register links are not displayed
+        self.assertNotIn(b'href="/login"', response.data)
+        self.assertNotIn(b'href="/register"', response.data)
