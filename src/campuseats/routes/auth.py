@@ -1,5 +1,5 @@
 # Authentication routes
-from flask import Blueprint, render_template, request, flash, redirect, url_for
+from flask import Blueprint, render_template, request, flash, redirect
 from werkzeug.security import generate_password_hash
 from campuseats.extensions import db
 from campuseats.models.user import User
@@ -18,10 +18,20 @@ def register():
         password = request.form.get("password", "")
         role = request.form.get("role", "")
 
-        # Validate that all required fields are provided
-        if not all([name, email, password, role]):
-            flash("Please complete all required fields.", "danger")
-            return render_template("register.html")
+        # Validate required fields and identify missing information
+        # Creates a dictionary.
+        required_fields = {
+            "Name": name,
+            "Email": email,
+            "Password": password,
+            "Role": role
+        }
+
+        #checks each field.
+        for field_name, value in required_fields.items():
+            if not value:
+                flash(f"Please complete all required fields. Missing: {field_name}.", "danger")
+                return render_template("register.html")        
 
         # Validate password length
         if len(password) < 8:
@@ -36,7 +46,7 @@ def register():
         # Check if the email is already registered
         existing_user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
         if existing_user:
-            flash("Email is already registered. Please log in or use a different email.", "danger")
+            flash("An account with that email already exists.", "danger")
             return render_template("register.html")
 
         # Hash password before storing it
@@ -63,6 +73,6 @@ def register():
 
         #confirm successful registration and redirect to login page
         flash("Account created successfully!", "success")
-        return redirect(url_for("auth.register"))  # Redirect to login page after successful registration
+        return redirect("/login")  # Redirect to login page after successful registration
 
     return render_template("register.html")

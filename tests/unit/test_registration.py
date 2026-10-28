@@ -41,7 +41,7 @@ class RegistrationTestCase(unittest.TestCase):
         })
 
         # Verify successful registration redirects
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/login")
 
         # Check that PostgreSQL-style model operations saved the user
         with self.app.app_context():
@@ -82,7 +82,7 @@ class RegistrationTestCase(unittest.TestCase):
         # Duplicate registration is rejected
         self.assertEqual(second_response.status_code, 200)
         self.assertIn(
-            b"Email is already registered",
+            b"An account with that email already exists.",
             second_response.data
         )
 
@@ -134,7 +134,7 @@ class RegistrationTestCase(unittest.TestCase):
 
         # Verify the error message appears
         self.assertIn(
-            b"Please complete all required fields.",
+            b"Missing: Name",
             response.data
         )
 
