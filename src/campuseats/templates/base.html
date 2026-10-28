@@ -28,6 +28,12 @@
                         </li>
                     {% else %}
                         <li class="nav-item">
+                            <span class="nav-link text-white">
+                                {{ current_user.name }} ({{ current_user.role | capitalize }})
+                            </span>
+                        </li>
+                        
+                        <li class="nav-item">
                             <form method="POST" action="{{ url_for('auth.logout') }}">
                                 <button type="submit" class="nav-link btn btn-link">
                                     Logout

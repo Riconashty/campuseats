@@ -161,9 +161,9 @@ class LoginLogoutTestCase(unittest.TestCase):
         # Log out
         response = self.client.post("/logout")
 
-        # Verify logout redirects to the home page
+        # Verify logout redirects to the login page
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.location, "login")
+        self.assertEqual(response.location, "/login")
 
 
         # Check that the session is cleared
@@ -326,3 +326,30 @@ class LoginLogoutTestCase(unittest.TestCase):
         # Verify no authenticated session was created
         with self.client.session_transaction() as session:
             self.assertNotIn("_user_id", session)
+
+    # Verify the navigation bar displays the authenticated user's name and role
+    def test_logged_in_user_name_and_role(self):
+
+        # Register a student account
+        self.client.post("/register", data={
+            "name": "Test Student",
+            "email": "student@example.invalid",
+            "password": "TestPassword123!",
+            "role": "student"
+        })
+
+        # Log in with valid credentials
+        login_response = self.client.post("/login", data={
+            "email": "student@example.invalid",
+            "password": "TestPassword123!"
+        })
+
+        self.assertEqual(login_response.status_code, 302)
+
+        # Visit the homepage while logged in
+        response = self.client.get("/")
+
+        # Verify the name and role are displayed
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Test Student (Student)", response.data)        
+        
