@@ -211,3 +211,23 @@ class LoginLogoutTestCase(unittest.TestCase):
         #verify login and register links are not displayed
         self.assertNotIn(b'href="/login"', response.data)
         self.assertNotIn(b'href="/register"', response.data)
+
+    # verfiy login fails when password field is empty:
+    def test_login_missing_password(self):
+
+        #attempt login without providing password
+        response = self.client.post("/login", data={
+        "email": "student@example.invalid",
+        "password": ""
+        })
+
+        # Verify the login page displays a validation error
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b"Please complete all required fields. Missing: Password.",
+            response.data
+        )
+
+        # Verify no authenticated session was created
+        with self.client.session_transaction() as session:
+            self.assertNotIn("_user_id", session)
