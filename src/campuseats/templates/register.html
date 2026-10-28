@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Register | CampusEats{% endblock %}
+
+{% block content %}
+    <h1>Create an Account</h1>
+    <!-- Full Name Field -->
+    <form method="POST">
+    <div class="mb-3">
+        <label for="name" class="form-label">Full Name</label>
+        <input type="text"
+               class="form-control"
+               id="name"
+               name="name"
+               required>
+    </div>
+
+    <!-- Email Field -->
+    <div class="mb-3">
+        <label for="email" class="form-label">Email Address</label>
+        <input type="email"
+               class="form-control"
+               id="email"
+               name="email"
+               required>
+    </div>
+
+    <!-- Password Field -->
+    <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <input type="password"
+               class="form-control"
+               id="password"
+               name="password"
+               minlength="8"
+               required>
+    </div>
+
+    <!-- Student/Vendor Selection -->
+    <div class="mb-3">
+        <label for="role" class="form-label">Account Type</label>
+        <select class="form-select"
+                id="role"
+                name="role"
+                required>
+            <option value="" disabled selected>Select an account type</option>
+            <option value="student">Student</option>
+            <option value="vendor">Vendor</option>
+        </select>
+    </div>
+
+<button type="submit" class="btn btn-primary">
+    Create Account
+</button>
+</form>
+{% endblock %}
