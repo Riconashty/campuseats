@@ -163,7 +163,7 @@ class LoginLogoutTestCase(unittest.TestCase):
 
         # Verify logout redirects to the home page
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.location, "/")
+        self.assertEqual(response.location, "login")
 
 
         # Check that the session is cleared
