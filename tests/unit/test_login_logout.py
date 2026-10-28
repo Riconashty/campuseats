@@ -166,3 +166,17 @@ class LoginLogoutTestCase(unittest.TestCase):
         # Check that the session is cleared
         with self.client.session_transaction() as session:
             self.assertNotIn("_user_id", session)
+
+
+    #verify logged out users see Login and Register links on the home page
+    def test_logged_out_navigation(self):
+
+        #visit homepage without logging in
+        response = self.client.get("/")
+
+        #verify login and register links are visible
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Login", response.data)
+
+        #Verify the logout button isn't displayed
+        self.assertIn(b"Register", response.data)
