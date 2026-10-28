@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to CampusEats{% endblock %}
+
+{% block content %}
+<div class="p-5 mb-4 bg-white rounded-3 shadow-sm border">
+    <div class="container-fluid py-3">
+        <h1 class="display-5 fw-bold text-success">Rescue Surplus Food on Campus</h1>
+        <p class="col-md-8 fs-5 text-secondary">
+            CampusEats connects campus food vendors with students to ensure leftover food is enjoyed rather than thrown away, reducing waste and hunger on campus.
+        </p>
+        <div class="d-flex gap-3 mt-4">
+            <button class="btn btn-success btn-lg px-4" type="button" disabled>Browse Listings</button>
+            <button class="btn btn-outline-secondary btn-lg px-4" type="button" disabled>Vendor Portal</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
