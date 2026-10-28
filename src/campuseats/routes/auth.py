@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for
 from werkzeug.security import generate_password_hash
 from campuseats.extensions import db
 from campuseats.models.user import User
+from sqlalchemy.exc import IntegrityError
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -50,11 +51,18 @@ def register():
         )
 
         #save the new user to PostgreSQL database
-        db.session.add(new_user)
-        db.session.commit()
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+
+        #If PostgreSQL rejects the record because of a database constraint, Python cathces the error. 
+        except IntegrityError: 
+            db.session.rollback()
+            flash("An error occurred while creating the account. Please try again.", "danger")
+            return render_template("register.html")
 
         #confirm successful registration and redirect to login page
-        flash("Account created successfully! Please log in.", "success")
-        return redirect(url_for("auth.get_login"))  # Redirect to login page after successful registration
+        flash("Account created successfully!", "success")
+        return redirect(url_for("auth.register"))  # Redirect to login page after successful registration
 
     return render_template("register.html")
