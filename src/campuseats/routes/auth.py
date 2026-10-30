@@ -1,10 +1,10 @@
 # Authentication routes
-from flask import Blueprint, render_template, request, flash, redirect
+from flask import Blueprint, render_template, request, flash, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 from campuseats.extensions import db
 from campuseats.models.user import User
 from sqlalchemy.exc import IntegrityError
-from flask_login import login_user, logout_user, login_required
+from flask_login import login_user, logout_user, login_required, current_user
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -74,7 +74,7 @@ def register():
 
         #confirm successful registration and redirect to login page
         flash("Account created successfully!", "success")
-        return redirect("/login")  # Redirect to login page after successful registration
+        return redirect(url_for("auth.login"))  # Redirect to login page after successful registration
 
     return render_template("register.html")
 
@@ -83,12 +83,16 @@ def register():
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
 
+    # Redirect users who are already logged in
+    if current_user.is_authenticated:
+        if current_user.role == "student":
+            return redirect("/listings")
+        elif current_user.role == "vendor":
+            return redirect("/vendor/listings")
+
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-
-        #Search database for user with the provided email
-        user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
 
         # Validate required fields and identify missing information
         required_fields = {
@@ -100,6 +104,9 @@ def login():
             if not value:
                 flash(f"Please complete all required fields. Missing: {field_name}.", "danger")
                 return render_template("auth/login.html")
+
+        #Search database for user with the provided email
+        user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
 
         # Check if user exists and password is correct
         if user is None or not check_password_hash(user.password_hash, password):
@@ -124,7 +131,8 @@ def login():
 
 # Logout route
 @auth_bp.post("/logout")
+@login_required
 def logout():
     logout_user()
     flash("You have been logged out successfully.", "success")
-    return redirect("/login")
+    return redirect(url_for("auth.login"))

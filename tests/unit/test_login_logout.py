@@ -9,7 +9,7 @@ if src_path not in sys.path:
 
 from campuseats import create_app
 from campuseats.config import TestingConfig
-from campuseats.routes.role_guards import student_required
+from campuseats.routes.role_guards import student_required, vendor_required
 from campuseats.extensions import db
 from campuseats.models.user import User
 
@@ -54,6 +54,32 @@ class LoginLogoutTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.location, "/listings")
 
+    # Verify an already logged-in student is redirected away from the login page
+    def test_logged_in_student_redirected_from_login(self):
+
+        # Register a student
+        self.client.post("/register", data={
+            "name": "Test Student",
+            "email": "student@example.invalid",
+            "password": "TestPassword123!",
+            "role": "student"
+        })
+
+        # Log in
+        login_response = self.client.post("/login", data={
+            "email": "student@example.invalid",
+            "password": "TestPassword123!"
+        })
+
+        self.assertEqual(login_response.status_code, 302)
+
+        # Try visiting the login page while already authenticated
+        response = self.client.get("/login")
+
+        # Verify student is redirected to their listings page
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/listings")
+
     # Verify a vendor can log in and is redirected to /vendor/listings
     def test_vendor_login(self):
 
@@ -74,6 +100,32 @@ class LoginLogoutTestCase(unittest.TestCase):
         })
 
         # Verify successful login redirects to the vendor listings
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/vendor/listings")
+
+    # Verify an already logged-in vendor is redirected away from the login page
+    def test_logged_in_vendor_redirected_from_login(self):
+
+        # Register a vendor
+        self.client.post("/register", data={
+            "name": "Test Vendor",
+            "email": "vendor@example.invalid",
+            "password": "VendorPassword123!",
+            "role": "vendor"
+        })
+
+        # Log in
+        login_response = self.client.post("/login", data={
+            "email": "vendor@example.invalid",
+            "password": "VendorPassword123!"
+        })
+
+        self.assertEqual(login_response.status_code, 302)
+
+        # Try visiting the login page while already authenticated
+        response = self.client.get("/login")
+
+        # Verify vendor is redirected to their listings page
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.location, "/vendor/listings")
 
@@ -167,6 +219,20 @@ class LoginLogoutTestCase(unittest.TestCase):
 
 
         # Check that the session is cleared
+        with self.client.session_transaction() as session:
+            self.assertNotIn("_user_id", session)
+
+    # Verify unauthenticated users cannot access the logout route
+    def test_logout_requires_login(self):
+
+        # Attempt to log out without being logged in
+        response = self.client.post("/logout")
+
+        # Verify user is redirected to the login page
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.startswith("/login"))
+
+        # Verify no authenticated session exists
         with self.client.session_transaction() as session:
             self.assertNotIn("_user_id", session)
 
@@ -292,6 +358,41 @@ class LoginLogoutTestCase(unittest.TestCase):
         response = self.client.get("/test/student-only")
         self.assertEqual(response.status_code, 403)
 
+    # Verify a vendor cannot access protected routes after logout
+    def test_vendor_protected_route_after_logout(self):
+
+        # Create a temporary protected route for testing
+        @self.app.get("/test/vendor-only")
+        @vendor_required
+        def vendor_only():
+            return "Vendor Access Granted"
+
+        # Register a vendor
+        self.client.post("/register", data={
+            "name": "Test Vendor",
+            "email": "vendor@example.invalid",
+            "password": "VendorPassword123!",
+            "role": "vendor"
+        })
+
+        # Log in
+        login_response = self.client.post("/login", data={
+            "email": "vendor@example.invalid",
+            "password": "VendorPassword123!"
+        })
+
+        self.assertEqual(login_response.status_code, 302)
+
+        # Verify access is allowed before logout
+        response = self.client.get("/test/vendor-only")
+        self.assertEqual(response.status_code, 200)
+
+        # Log out
+        self.client.post("/logout")
+
+        # Verify access is denied after logout
+        response = self.client.get("/test/vendor-only")
+        self.assertEqual(response.status_code, 403)
 
     # Verify users with invalid roles cannot log in
     def test_login_invalid_role(self):
