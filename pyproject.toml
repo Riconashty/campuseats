@@ -23,3 +23,42 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = "--cov=campuseats --cov-report=term-missing --cov-fail-under=80"
+filterwarnings = [
+    "ignore::ResourceWarning",
+]
+
+[tool.coverage.run]
+source = ["campuseats"]
+omit = [
+    "run.py",
+    "src/campuseats/config.py",
+    "tests/*",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+omit = [
+    "run.py",
+    "src/campuseats/config.py",
+    "tests/*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501",
+    "E402",
+    "W291",
+    "W292",
+    "W293",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/campuseats/__init__.py" = ["F401"]
+"run.py" = ["F401"]

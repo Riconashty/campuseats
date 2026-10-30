@@ -14,7 +14,7 @@ def create_app(config_class=Config):
     db.init_app(app)
 
     app.register_blueprint(main_bp)
-    app.register_blueprint(auth_bp) #include the auth blueprint for authentication routes
+    app.register_blueprint(auth_bp)  # include the auth blueprint for authentication routes
 
     with app.app_context():
         db.session.execute(text("SELECT 1"))  # fails loudly if the DB is unreachable
