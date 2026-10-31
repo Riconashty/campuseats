@@ -108,10 +108,8 @@ Desktop.ini
 .idea/
 *.iws
 *.iml
+.jbeval/
 
 # VS Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
+.vscode/
 *.code-workspace
