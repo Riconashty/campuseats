@@ -1,0 +1,6 @@
+# Development and testing dependencies
+-r requirements.txt
+pytest>=8.0.0
+pytest-cov>=5.0.0
+ruff>=0.5.0
+pre-commit>=3.7.0
