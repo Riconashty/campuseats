@@ -140,7 +140,7 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_invalid_password(self):
 
         # First, register a student account
-        registration_response = self.client.post(
+        self.client.post(
             "/register",
             data={
                 "name": "Test Student",
