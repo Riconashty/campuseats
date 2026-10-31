@@ -31,6 +31,7 @@ class AppFactoryTestCase(unittest.TestCase):
 
     def test_landing_page_url_for(self):
         from flask import url_for
+
         with self.app.test_request_context():
             self.assertEqual(url_for("main.index"), "/")
 

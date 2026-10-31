@@ -11,7 +11,6 @@ auth_bp = Blueprint("auth", __name__)
 # Registration page
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
-
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
@@ -20,18 +19,13 @@ def register():
 
         # Validate required fields and identify missing information
         # Creates a dictionary.
-        required_fields = {
-            "Name": name,
-            "Email": email,
-            "Password": password,
-            "Role": role
-        }
+        required_fields = {"Name": name, "Email": email, "Password": password, "Role": role}
 
-        #checks each field.
+        # checks each field.
         for field_name, value in required_fields.items():
             if not value:
                 flash(f"Please complete all required fields. Missing: {field_name}.", "danger")
-                return render_template("register.html")        
+                return render_template("register.html")
 
         # Validate password length
         if len(password) < 8:
@@ -44,7 +38,9 @@ def register():
             return render_template("register.html")
 
         # Check if the email is already registered
-        existing_user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
+        existing_user = db.session.execute(
+            db.select(User).filter_by(email=email)
+        ).scalar_one_or_none()
         if existing_user:
             flash("An account with that email already exists.", "danger")
             return render_template("register.html")
@@ -53,25 +49,20 @@ def register():
         password_hash = generate_password_hash(password)
 
         # Create new User object
-        new_user = User(
-            name=name,
-            email=email,
-            password_hash=password_hash,
-            role=role
-        )
+        new_user = User(name=name, email=email, password_hash=password_hash, role=role)
 
-        #save the new user to PostgreSQL database
+        # save the new user to PostgreSQL database
         try:
             db.session.add(new_user)
             db.session.commit()
 
-        #If PostgreSQL rejects the record because of a database constraint, Python cathces the error. 
-        except IntegrityError: 
+        # If PostgreSQL rejects the record because of a database constraint, Python cathces the error.
+        except IntegrityError:
             db.session.rollback()
             flash("An error occurred while creating the account. Please try again.", "danger")
             return render_template("register.html")
 
-        #confirm successful registration and redirect to login page
+        # confirm successful registration and redirect to login page
         flash("Account created successfully!", "success")
         return redirect("/login")  # Redirect to login page after successful registration
 
