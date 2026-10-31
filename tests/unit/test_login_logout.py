@@ -15,7 +15,6 @@ from campuseats.models.user import User
 
 
 class LoginLogoutTestCase(unittest.TestCase):
-
     # Prepare a Flask application and test client before each test
     def setUp(self):
         self.app = create_app(TestingConfig)
@@ -25,30 +24,32 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_login_page_loads(self):
         response = self.client.get("/login")
 
-        #verifies response
+        # verifies response
         self.assertEqual(response.status_code, 200)
 
-        #checks page content
+        # checks page content
         self.assertIn(b"Log In", response.data)
 
     # Verify a student can log in and is redirected to /listings
     def test_student_login(self):
 
         # First, register a student account
-        registration_response = self.client.post("/register", data={
-            "name": "Test Student",
-            "email": "student@example.invalid",
-            "password": "TestPassword123!",
-            "role": "student"
-        })
+        registration_response = self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
 
         self.assertEqual(registration_response.status_code, 302)
 
         # Log in using the registered student's credentials
-        response = self.client.post("/login", data={
-            "email": "student@example.invalid",
-            "password": "TestPassword123!"
-        })
+        response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": "TestPassword123!"}
+        )
 
         # Verify successful login redirects to the student listings
         self.assertEqual(response.status_code, 302)
@@ -58,18 +59,20 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_logged_in_student_redirected_from_login(self):
 
         # Register a student
-        self.client.post("/register", data={
-            "name": "Test Student",
-            "email": "student@example.invalid",
-            "password": "TestPassword123!",
-            "role": "student"
-        })
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
 
         # Log in
-        login_response = self.client.post("/login", data={
-            "email": "student@example.invalid",
-            "password": "TestPassword123!"
-        })
+        login_response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": "TestPassword123!"}
+        )
 
         self.assertEqual(login_response.status_code, 302)
 
@@ -84,20 +87,22 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_vendor_login(self):
 
         # First, register a vendor account
-        registration_response = self.client.post("/register", data={
-            "name": "Test Vendor",
-            "email": "vendor@example.invalid",
-            "password": "VendorPassword123!",
-            "role": "vendor"
-        })
+        registration_response = self.client.post(
+            "/register",
+            data={
+                "name": "Test Vendor",
+                "email": "vendor@example.invalid",
+                "password": "VendorPassword123!",
+                "role": "vendor",
+            },
+        )
 
         self.assertEqual(registration_response.status_code, 302)
 
         # Log in using the registered vendor's credentials
-        response = self.client.post("/login", data={
-            "email": "vendor@example.invalid",
-            "password": "VendorPassword123!"
-        })
+        response = self.client.post(
+            "/login", data={"email": "vendor@example.invalid", "password": "VendorPassword123!"}
+        )
 
         # Verify successful login redirects to the vendor listings
         self.assertEqual(response.status_code, 302)
@@ -107,18 +112,20 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_logged_in_vendor_redirected_from_login(self):
 
         # Register a vendor
-        self.client.post("/register", data={
-            "name": "Test Vendor",
-            "email": "vendor@example.invalid",
-            "password": "VendorPassword123!",
-            "role": "vendor"
-        })
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Vendor",
+                "email": "vendor@example.invalid",
+                "password": "VendorPassword123!",
+                "role": "vendor",
+            },
+        )
 
         # Log in
-        login_response = self.client.post("/login", data={
-            "email": "vendor@example.invalid",
-            "password": "VendorPassword123!"
-        })
+        login_response = self.client.post(
+            "/login", data={"email": "vendor@example.invalid", "password": "VendorPassword123!"}
+        )
 
         self.assertEqual(login_response.status_code, 302)
 
@@ -133,18 +140,20 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_invalid_password(self):
 
         # First, register a student account
-        registration_response = self.client.post("/register", data={
-            "name": "Test Student",
-            "email": "student@example.invalid",
-            "password": "TestPassword123!",
-            "role": "student"
-        })
+        registration_response = self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
 
         # Try to log in with incorrect password
-        response = self.client.post("/login", data={
-            "email": "student@example.invalid",
-            "password": "WrongPassword123!"
-        })
+        response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": "WrongPassword123!"}
+        )
 
         # Verify login fails
         self.assertEqual(response.status_code, 200)
@@ -154,10 +163,9 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_invalid_email(self):
 
         # Try to log in with incorrect email
-        response = self.client.post("/login", data={
-            "email": "wrong@example.invalid",
-            "password": "TestPassword123!"
-        })
+        response = self.client.post(
+            "/login", data={"email": "wrong@example.invalid", "password": "TestPassword123!"}
+        )
 
         # Verify login fails
         self.assertEqual(response.status_code, 200)
@@ -167,18 +175,20 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_login_creates_session(self):
 
         # Register a student
-        self.client.post("/register", data={
-            "name": "Test Student",
-            "email": "student@example.invalid",
-            "password": "TestPassword123!",
-            "role": "student"
-        })
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
 
         # Log in with valid credentials
-        response = self.client.post("/login", data={
-            "email": "student@example.invalid",
-            "password": "TestPassword123!"
-        })
+        response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": "TestPassword123!"}
+        )
 
         self.assertEqual(response.status_code, 302)
 
@@ -186,27 +196,29 @@ class LoginLogoutTestCase(unittest.TestCase):
         with self.client.session_transaction() as session:
             self.assertIn("_user_id", session)
 
-    #Verify that logout clears the authenticated session and redirects to the home page
+    # Verify that logout clears the authenticated session and redirects to the home page
     def test_logout_clears_session(self):
 
         # Register and log in a student
-        self.client.post("/register", data={
-            "name": "Test Student",
-            "email": "student@example.invalid",
-            "password": "TestPassword123!",
-            "role": "student"
-        })
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
 
-        #Log in with valid credentials
-        login_response = self.client.post("/login", data={
-            "email": "student@example.invalid",
-            "password": "TestPassword123!"
-        })
+        # Log in with valid credentials
+        login_response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": "TestPassword123!"}
+        )
 
-        #verify login was successful
+        # verify login was successful
         self.assertEqual(login_response.status_code, 302)
 
-        #Verify user is logged in
+        # Verify user is logged in
         with self.client.session_transaction() as session:
             self.assertIn("_user_id", session)
 
@@ -216,7 +228,6 @@ class LoginLogoutTestCase(unittest.TestCase):
         # Verify logout redirects to the login page
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.location, "/login")
-
 
         # Check that the session is cleared
         with self.client.session_transaction() as session:
@@ -236,37 +247,37 @@ class LoginLogoutTestCase(unittest.TestCase):
         with self.client.session_transaction() as session:
             self.assertNotIn("_user_id", session)
 
-
-    #verify logged out users see Login and Register links on the home page
+    # verify logged out users see Login and Register links on the home page
     def test_logged_out_navigation(self):
 
-        #visit homepage without logging in
+        # visit homepage without logging in
         response = self.client.get("/")
 
-        #verify login and register links are visible
+        # verify login and register links are visible
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Login", response.data)
 
-        #Verify the logout button isn't displayed
+        # Verify the logout button isn't displayed
         self.assertIn(b"Register", response.data)
 
-
-    #verify logged in users see logout instead of login or register
+    # verify logged in users see logout instead of login or register
     def test_logged_in_navigation(self):
 
         # Register and log in a student
-        self.client.post("/register", data={
-            "name": "Test Student",
-            "email": "student@example.invalid",
-            "password": "TestPassword123!",
-            "role": "student"
-        })
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
 
         # Log in with valid credentials
-        login_response = self.client.post("/login", data={
-            "email": "student@example.invalid",
-            "password": "TestPassword123!"
-        })
+        login_response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": "TestPassword123!"}
+        )
 
         # Verify login was successful
         self.assertEqual(login_response.status_code, 302)
@@ -277,25 +288,21 @@ class LoginLogoutTestCase(unittest.TestCase):
         # Verify logout button is displayed
         self.assertIn(b'action="/logout"', response.data)
 
-        #verify login and register links are not displayed
+        # verify login and register links are not displayed
         self.assertNotIn(b'href="/login"', response.data)
         self.assertNotIn(b'href="/register"', response.data)
 
     # verfiy login fails when password field is empty:
     def test_login_missing_password(self):
 
-        #attempt login without providing password
-        response = self.client.post("/login", data={
-        "email": "student@example.invalid",
-        "password": ""
-        })
+        # attempt login without providing password
+        response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": ""}
+        )
 
         # Verify the login page displays a validation error
         self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            b"Please complete all required fields. Missing: Password.",
-            response.data
-        )
+        self.assertIn(b"Please complete all required fields. Missing: Password.", response.data)
 
         # Verify no authenticated session was created
         with self.client.session_transaction() as session:
@@ -305,22 +312,15 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_login_missing_email(self):
 
         # Attempt login without providing an email
-        response = self.client.post("/login", data={
-            "email": "",
-            "password": "TestPassword123!"
-        })
+        response = self.client.post("/login", data={"email": "", "password": "TestPassword123!"})
 
         # Verify the login page displays a validation error
         self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            b"Please complete all required fields. Missing: Email.",
-            response.data
-        )
+        self.assertIn(b"Please complete all required fields. Missing: Email.", response.data)
 
         # Verify no authenticated session was created
         with self.client.session_transaction() as session:
             self.assertNotIn("_user_id", session)
-
 
     # Verify a student cannot access protected routes after logout
     def test_protected_route_after_logout(self):
@@ -332,18 +332,20 @@ class LoginLogoutTestCase(unittest.TestCase):
             return "Student Access Granted"
 
         # Register a student
-        self.client.post("/register", data={
-            "name": "Test Student",
-            "email": "student@example.invalid",
-            "password": "TestPassword123!",
-            "role": "student"
-        })
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
 
         # Log in
-        login_response = self.client.post("/login", data={
-            "email": "student@example.invalid",
-            "password": "TestPassword123!"
-        })
+        login_response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": "TestPassword123!"}
+        )
 
         self.assertEqual(login_response.status_code, 302)
 
@@ -368,18 +370,20 @@ class LoginLogoutTestCase(unittest.TestCase):
             return "Vendor Access Granted"
 
         # Register a vendor
-        self.client.post("/register", data={
-            "name": "Test Vendor",
-            "email": "vendor@example.invalid",
-            "password": "VendorPassword123!",
-            "role": "vendor"
-        })
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Vendor",
+                "email": "vendor@example.invalid",
+                "password": "VendorPassword123!",
+                "role": "vendor",
+            },
+        )
 
         # Log in
-        login_response = self.client.post("/login", data={
-            "email": "vendor@example.invalid",
-            "password": "VendorPassword123!"
-        })
+        login_response = self.client.post(
+            "/login", data={"email": "vendor@example.invalid", "password": "VendorPassword123!"}
+        )
 
         self.assertEqual(login_response.status_code, 302)
 
@@ -398,12 +402,15 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_login_invalid_role(self):
 
         # Register a valid student
-        self.client.post("/register", data={
-            "name": "Test Student",
-            "email": "student@example.invalid",
-            "password": "TestPassword123!",
-            "role": "student"
-        })
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
 
         # Simulate an invalid role stored in the database
         with self.app.app_context():
@@ -415,10 +422,9 @@ class LoginLogoutTestCase(unittest.TestCase):
             db.session.commit()
 
         # Attempt to log in
-        response = self.client.post("/login", data={
-            "email": "student@example.invalid",
-            "password": "TestPassword123!"
-        })
+        response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": "TestPassword123!"}
+        )
 
         # Verify login is rejected
         self.assertEqual(response.status_code, 200)
@@ -432,18 +438,20 @@ class LoginLogoutTestCase(unittest.TestCase):
     def test_logged_in_user_name_and_role(self):
 
         # Register a student account
-        self.client.post("/register", data={
-            "name": "Test Student",
-            "email": "student@example.invalid",
-            "password": "TestPassword123!",
-            "role": "student"
-        })
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
 
         # Log in with valid credentials
-        login_response = self.client.post("/login", data={
-            "email": "student@example.invalid",
-            "password": "TestPassword123!"
-        })
+        login_response = self.client.post(
+            "/login", data={"email": "student@example.invalid", "password": "TestPassword123!"}
+        )
 
         self.assertEqual(login_response.status_code, 302)
 
@@ -452,5 +460,4 @@ class LoginLogoutTestCase(unittest.TestCase):
 
         # Verify the name and role are displayed
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Test Student (Student)", response.data)        
-        
+        self.assertIn(b"Test Student (Student)", response.data)

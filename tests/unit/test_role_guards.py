@@ -7,14 +7,10 @@ from werkzeug.exceptions import Forbidden
 
 
 class RoleGuardsTestCase(unittest.TestCase):
-
     def test_vendor_can_access_vendor_route(self):
 
         # Create a simulated authenticated vendor
-        vendor = SimpleNamespace(
-            is_authenticated=True,
-            role="vendor"
-        )
+        vendor = SimpleNamespace(is_authenticated=True, role="vendor")
 
         # Simulate the current logged-in user
         with patch.object(role_guards, "current_user", vendor):
@@ -24,15 +20,11 @@ class RoleGuardsTestCase(unittest.TestCase):
                 return "Access Granted"
 
             self.assertEqual(protected_view(), "Access Granted")
-
 
     def test_student_cannot_access_vendor_route(self):
 
         # Create a simulated authenticated student
-        student = SimpleNamespace(
-            is_authenticated=True,
-            role="student"
-        )
+        student = SimpleNamespace(is_authenticated=True, role="student")
 
         # Simulate the current logged-in user
         with patch.object(role_guards, "current_user", student):
@@ -45,14 +37,10 @@ class RoleGuardsTestCase(unittest.TestCase):
             with self.assertRaises(Forbidden):
                 protected_view()
 
-
     def test_student_can_access_student_route(self):
 
         # Create a simulated authenticated student
-        student = SimpleNamespace(
-            is_authenticated=True,
-            role="student"
-        )
+        student = SimpleNamespace(is_authenticated=True, role="student")
 
         # Simulate the current logged-in user
         with patch.object(role_guards, "current_user", student):
@@ -63,14 +51,10 @@ class RoleGuardsTestCase(unittest.TestCase):
 
             self.assertEqual(protected_view(), "Access Granted")
 
-
     def test_vendor_cannot_access_student_route(self):
 
         # Create a simulated authenticated vendor
-        vendor = SimpleNamespace(
-            is_authenticated=True,
-            role="vendor"
-        )
+        vendor = SimpleNamespace(is_authenticated=True, role="vendor")
 
         # Simulate the current logged-in user
         with patch.object(role_guards, "current_user", vendor):
@@ -83,13 +67,10 @@ class RoleGuardsTestCase(unittest.TestCase):
             with self.assertRaises(Forbidden):
                 protected_view()
 
-
     def test_logged_out_user_cannot_access_vendor_route(self):
 
         # Create a simulated logged-out user
-        logged_out_user = SimpleNamespace(
-            is_authenticated=False
-        )
+        logged_out_user = SimpleNamespace(is_authenticated=False)
 
         # Simulate the current logged-in user
         with patch.object(role_guards, "current_user", logged_out_user):
@@ -102,13 +83,10 @@ class RoleGuardsTestCase(unittest.TestCase):
             with self.assertRaises(Forbidden):
                 protected_view()
 
-
     def test_logged_out_user_cannot_access_student_route(self):
 
         # Create a simulated logged-out user
-        logged_out_user = SimpleNamespace(
-            is_authenticated=False
-        )
+        logged_out_user = SimpleNamespace(is_authenticated=False)
 
         # Simulate the current logged-in user
         with patch.object(role_guards, "current_user", logged_out_user):
