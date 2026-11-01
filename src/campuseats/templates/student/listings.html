@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Listings - CampusEats{% endblock %}
+
+{% block content %}
+<h1 class="mb-4 fw-bold text-success">Available Food Listings</h1>
+
+<div class="row g-4">
+  {% for listing in listings %}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">{{ listing.title }}</h5>
+        <h6 class="card-subtitle mb-2 text-secondary">{{ listing.vendor.name }}</h6>
+
+        <p class="mb-1"><strong>Location:</strong> {{ listing.pickup_location }}</p>
+        <p class="mb-1"><strong>Portions left:</strong> {{ listing.remaining_portions }}</p>
+        <p class="mb-2">
+          <strong>Pickup:</strong>
+          {{ listing.pickup_start.strftime('%b %d, %I:%M %p') }} to
+          {{ listing.pickup_end.strftime('%I:%M %p') }}
+        </p>
+
+        <div class="mb-2">
+          {% for tag in listing.dietary_tags %}
+          <span class="badge bg-success">{{ tag.name }}</span>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card-footer bg-transparent">
+        {# Placeholder for portion selection and reserve action (built in SCRUM-29). #}
+        <div class="reserve-area" data-listing-id="{{ listing.id }}"></div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="alert alert-info text-center">
+      No food is available right now. Check back soon!
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

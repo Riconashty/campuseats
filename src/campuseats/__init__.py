@@ -2,6 +2,7 @@ from flask import Flask
 from sqlalchemy import text
 from campuseats.config import Config
 from campuseats.routes.main import main_bp
+from campuseats.routes.student import student_bp
 from campuseats.extensions import db, login_manager
 from campuseats.models.user import User
 from campuseats.routes.auth import auth_bp
@@ -29,6 +30,7 @@ def create_app(config_class=Config):
     app.register_blueprint(main_bp)
     # include the auth blueprint for authentication routes
     app.register_blueprint(auth_bp)
+    app.register_blueprint(student_bp)
 
     with app.app_context():
         db.session.execute(text("SELECT 1"))  # fails loudly if the DB is unreachable
