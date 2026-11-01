@@ -183,3 +183,42 @@ ruff check .
 # Run linter with auto-fix
 ruff check --fix .
 ```
+
+---
+
+## Automated Black Box Testing (Selenium - US1)
+
+As required by the project specifications, an automated black box browser test is implemented for **User Story 1 (User Registration and Authentication)** in `tests/integration/test_us1_selenium.py`.
+
+### What the Test Covers
+The test suite drives **Google Chrome in headless mode** against a live application deployment without directly invoking any internal Python application functions:
+- **AC 1 (Registration):** Valid student and vendor account creation, form submissions, and redirects to `/login` with success flash banners.
+- **AC 2 (Duplicate Email):** Rejection of duplicate email addresses with error message `"An account with that email already exists."`.
+- **AC 3 (Form Validation):** Missing required fields and password length constraints (< 8 characters).
+- **AC 4 (Invalid Authentication):** Incorrect password and nonexistent email login attempts showing `"Invalid email or password."`.
+- **AC 5 (Authentication & Logout Flow):** Valid login, role-specific navigation updates showing the user's name and role in the navbar, and session destruction on logout.
+- **AC 6 (Seed Account Login):** Direct authentication with pre-seeded vendor credentials.
+
+### How to Run the Selenium Suite
+
+#### 1. Start the Live Application
+Start the application using Docker Compose (Recommended):
+```bash
+docker compose up
+```
+*(Or start locally with `./scripts/start-db.sh && python run.py`)*
+
+#### 2. Execute the Automated Runner
+In a separate terminal window:
+```bash
+./scripts/run-selenium.sh
+```
+
+Alternatively, you can run pytest directly:
+```bash
+pytest tests/integration/test_us1_selenium.py --no-cov -v -s
+```
+
+> [!NOTE]
+> When the web server is offline (such as during standard local `./scripts/verify.sh` runs), the Selenium tests automatically detect the offline state, print a helpful diagnostic message, and skip gracefully without failing the build or test coverage gate.
+
