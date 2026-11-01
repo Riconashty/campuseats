@@ -11,10 +11,10 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "DATABASE_URL",
-        "postgresql://postgres:postgres@localhost:5432/campuseats",
+        "postgresql+psycopg2://campuseats:devpassword@localhost:5432/campuseats",
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    PORT = int(os.environ.get("PORT", 5000))
+    PORT = int(os.environ.get("PORT", 5001))
     DEBUG = bool(os.environ.get("DEBUG", False))
 
 

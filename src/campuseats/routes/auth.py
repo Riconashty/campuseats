@@ -12,7 +12,6 @@ auth_bp = Blueprint("auth", __name__)
 # Registration page
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
-
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
@@ -76,7 +75,6 @@ def register():
 # Login page
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-
     # Redirect users who are already logged in
     if current_user.is_authenticated:
         if current_user.role == "student":
