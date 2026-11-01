@@ -20,6 +20,13 @@ class RegistrationTestCase(unittest.TestCase):
         self.app = create_app(TestingConfig)
         self.client = self.app.test_client()
 
+    # Clean up database resources and close SQLite connections after each test.
+    def tearDown(self):
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+            db.engine.dispose()
+
     # Checks to see registration page loads successfully.
     def test_registration_page_loads(self):
         response = self.client.get("/register")

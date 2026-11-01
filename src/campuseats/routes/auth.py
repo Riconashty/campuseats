@@ -12,7 +12,6 @@ auth_bp = Blueprint("auth", __name__)
 # Registration page
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
-
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
@@ -76,7 +75,6 @@ def register():
 # Login page
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-
     # Redirect users who are already logged in
     if current_user.is_authenticated:
         if current_user.role == "student":
@@ -94,7 +92,7 @@ def login():
         for field_name, value in required_fields.items():
             if not value:
                 flash(f"Please complete all required fields. Missing: {field_name}.", "danger")
-                return render_template("auth/login.html")
+                return render_template("auth/login.html", email=email)
 
         # Search database for user with the provided email
         user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
@@ -102,15 +100,21 @@ def login():
         # Check if user exists and password is correct
         if user is None or not check_password_hash(user.password_hash, password):
             flash("Invalid email or password.", "danger")
-            return render_template("auth/login.html")
+            return render_template("auth/login.html", email=email)
 
         # Verify that the user has a valid role
         if user.role not in ["student", "vendor"]:
             flash("Unable to log in with this account.", "danger")
-            return render_template("auth/login.html")
+            return render_template("auth/login.html", email=email)
 
         # Log in user after successful authentication
         login_user(user)
+
+        # Handle next query parameter if present and safe
+        next_page = request.args.get("next")
+        if next_page and next_page.startswith("/") and not next_page.startswith("//"):
+            return redirect(next_page)
+
         # Redirect user depending on their role
         if user.role == "student":
             return redirect("/listings")
