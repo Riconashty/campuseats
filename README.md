@@ -186,39 +186,21 @@ ruff check --fix .
 
 ---
 
-## Automated Black Box Testing (Selenium - US1)
+## Automated Black Box Testing (Selenium)
 
-As required by the project specifications, an automated black box browser test is implemented for **User Story 1 (User Registration and Authentication)** in `tests/integration/test_us1_selenium.py`.
+Automated end-to-end browser tests drive the live application through headless Google Chrome without calling internal Python code directly.
 
-### What the Test Covers
-The test suite drives **Google Chrome in headless mode** against a live application deployment without directly invoking any internal Python application functions:
-- **AC 1 (Registration):** Valid student and vendor account creation, form submissions, and redirects to `/login` with success flash banners.
-- **AC 2 (Duplicate Email):** Rejection of duplicate email addresses with error message `"An account with that email already exists."`.
-- **AC 3 (Form Validation):** Missing required fields and password length constraints (< 8 characters).
-- **AC 4 (Invalid Authentication):** Incorrect password and nonexistent email login attempts showing `"Invalid email or password."`.
-- **AC 5 (Authentication & Logout Flow):** Valid login, role-specific navigation updates showing the user's name and role in the navbar, and session destruction on logout.
-- **AC 6 (Seed Account Login):** Direct authentication with pre-seeded vendor credentials.
-
-### How to Run the Selenium Suite
-
-#### 1. Start the Live Application
-Start the application using Docker Compose (Recommended):
-```bash
-docker compose up
-```
-*(Or start locally with `./scripts/start-db.sh && python run.py`)*
-
-#### 2. Execute the Automated Runner
-In a separate terminal window:
+### Running the Tests
+With the application running (`docker compose up` or `python run.py`), execute:
 ```bash
 ./scripts/run-selenium.sh
 ```
-
-Alternatively, you can run pytest directly:
-```bash
-pytest tests/integration/test_us1_selenium.py --no-cov -v -s
-```
+*(Or directly via pytest: `pytest tests/integration/test_us1_selenium.py --no-cov -v`)*
 
 > [!NOTE]
-> When the web server is offline (such as during standard local `./scripts/verify.sh` runs), the Selenium tests automatically detect the offline state, print a helpful diagnostic message, and skip gracefully without failing the build or test coverage gate.
+> If the live server is offline (e.g. during `./scripts/verify.sh`), Selenium tests skip gracefully without failing the test run or coverage gate.
+
+### Covered Stories
+- **US1 (Registration & Login):** Validates account creation (student & vendor), duplicate email rejection, validation constraints, invalid credentials, navbar role states, and logout.
+- *Additional user story test suites will be added here as subsequent stories are completed.*
 
