@@ -20,6 +20,13 @@ class LoginLogoutTestCase(unittest.TestCase):
         self.app = create_app(TestingConfig)
         self.client = self.app.test_client()
 
+    # Clean up database resources and close SQLite connections after each test
+    def tearDown(self):
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+            db.engine.dispose()
+
     # Verify the login page loads successfully
     def test_login_page_loads(self):
         response = self.client.get("/login")
@@ -32,7 +39,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify a student can log in and is redirected to /listings
     def test_student_login(self):
-
         # First, register a student account
         registration_response = self.client.post(
             "/register",
@@ -57,7 +63,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify an already logged-in student is redirected away from the login page
     def test_logged_in_student_redirected_from_login(self):
-
         # Register a student
         self.client.post(
             "/register",
@@ -85,7 +90,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify a vendor can log in and is redirected to /vendor/listings
     def test_vendor_login(self):
-
         # First, register a vendor account
         registration_response = self.client.post(
             "/register",
@@ -110,7 +114,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify an already logged-in vendor is redirected away from the login page
     def test_logged_in_vendor_redirected_from_login(self):
-
         # Register a vendor
         self.client.post(
             "/register",
@@ -138,7 +141,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify login fails when password is incorrect
     def test_invalid_password(self):
-
         # First, register a student account
         self.client.post(
             "/register",
@@ -161,7 +163,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify login fails when email is incorrect
     def test_invalid_email(self):
-
         # Try to log in with incorrect email
         response = self.client.post(
             "/login", data={"email": "wrong@example.invalid", "password": "TestPassword123!"}
@@ -173,7 +174,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify successful login creates an authenticated session
     def test_login_creates_session(self):
-
         # Register a student
         self.client.post(
             "/register",
@@ -198,7 +198,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify that logout clears the authenticated session and redirects to the home page
     def test_logout_clears_session(self):
-
         # Register and log in a student
         self.client.post(
             "/register",
@@ -235,7 +234,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify unauthenticated users cannot access the logout route
     def test_logout_requires_login(self):
-
         # Attempt to log out without being logged in
         response = self.client.post("/logout")
 
@@ -249,7 +247,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # verify logged out users see Login and Register links on the home page
     def test_logged_out_navigation(self):
-
         # visit homepage without logging in
         response = self.client.get("/")
 
@@ -262,7 +259,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # verify logged in users see logout instead of login or register
     def test_logged_in_navigation(self):
-
         # Register and log in a student
         self.client.post(
             "/register",
@@ -294,7 +290,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # verfiy login fails when password field is empty:
     def test_login_missing_password(self):
-
         # attempt login without providing password
         response = self.client.post(
             "/login", data={"email": "student@example.invalid", "password": ""}
@@ -310,7 +305,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify login fails when the email field is empty
     def test_login_missing_email(self):
-
         # Attempt login without providing an email
         response = self.client.post("/login", data={"email": "", "password": "TestPassword123!"})
 
@@ -324,7 +318,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify a student cannot access protected routes after logout
     def test_protected_route_after_logout(self):
-
         # Create a temporary protected route for testing
         @self.app.get("/test/student-only")
         @student_required
@@ -362,7 +355,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify a vendor cannot access protected routes after logout
     def test_vendor_protected_route_after_logout(self):
-
         # Create a temporary protected route for testing
         @self.app.get("/test/vendor-only")
         @vendor_required
@@ -400,7 +392,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify users with invalid roles cannot log in
     def test_login_invalid_role(self):
-
         # Register a valid student
         self.client.post(
             "/register",
@@ -436,7 +427,6 @@ class LoginLogoutTestCase(unittest.TestCase):
 
     # Verify the navigation bar displays the authenticated user's name and role
     def test_logged_in_user_name_and_role(self):
-
         # Register a student account
         self.client.post(
             "/register",
@@ -461,3 +451,48 @@ class LoginLogoutTestCase(unittest.TestCase):
         # Verify the name and role are displayed
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Test Student (Student)", response.data)
+
+    # Verify that failed login preserves the entered email address in the form
+    def test_failed_login_preserves_email(self):
+        response = self.client.post(
+            "/login",
+            data={"email": "keepme@example.invalid", "password": "WrongPassword!"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'value="keepme@example.invalid"', response.data)
+
+    # Verify that valid next query parameter is honored upon successful login
+    def test_login_handles_next_parameter(self):
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
+        response = self.client.post(
+            "/login?next=/profile",
+            data={"email": "student@example.invalid", "password": "TestPassword123!"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/profile")
+
+    # Verify that external or malicious next redirect URLs are ignored
+    def test_login_ignores_unsafe_next_parameter(self):
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
+        response = self.client.post(
+            "/login?next=https://malicious-site.invalid",
+            data={"email": "student@example.invalid", "password": "TestPassword123!"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/listings")

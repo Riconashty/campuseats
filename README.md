@@ -38,11 +38,23 @@ pre-commit install
 cp .env.example .env
 ```
 
-### 6. Run the Application
+### 6. Start the PostgreSQL Database (Docker)
+Ensure Docker Desktop is open and run the database starter script:
+```bash
+./scripts/start-db.sh
+```
+*(Alternatively, run `docker compose up -d db` directly).*
+
+### 7. Run the Application
 ```bash
 python run.py
 ```
 Open `http://localhost:5000` in your browser.
+
+When you're finished, stop the database container with:
+```bash
+./scripts/stop-db.sh
+```
 
 ---
 
