@@ -4,15 +4,21 @@ CampusEats connects campus food vendors that have leftover food with students wh
 
 ---
 
-## Running with Docker Compose (Recommended & Grading Deployment)
+## Running with Docker Compose
 
 The entire application (Flask web server + PostgreSQL database) can be started with a single command from the repository root:
 
+#### First Time:
 ```bash
 docker compose up --build
 ```
 
-Once started, open `http://localhost:5000` in your browser.
+#### All Other Times:
+```bash
+docker compose up
+```
+
+Once started, open `http://localhost:5001` in your browser.
 
 ### Automatic Seed Accounts
 On first launch, the database automatically initializes the schema and creates demo accounts for grading:
@@ -129,7 +135,7 @@ cp .env.example .env
 ```bash
 python run.py
 ```
-Open `http://localhost:5000` in your browser. When finished, stop the database with:
+Open `http://localhost:5001` in your browser. When finished, stop the database with:
 ```bash
 ./scripts/stop-db.sh
 ```
