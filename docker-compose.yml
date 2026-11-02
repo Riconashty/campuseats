@@ -17,5 +17,21 @@ services:
       timeout: 3s
       retries: 5
 
+  web:
+    build: .
+    container_name: campuseats-web
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://campuseats:devpassword@db:5432/campuseats
+      SECRET_KEY: dev-secret-key-change-in-production
+      PORT: 5001
+      FLASK_DEBUG: 0
+      SEED_DEMO_USERS: "true"
+    ports:
+      - "5001:5001"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   postgres_data:

@@ -36,7 +36,7 @@ else
     docker compose up -d db
 fi
 
-echo "Waiting for database server to accept connections..."
+echo "Waiting for database to become ready..."
 ATTEMPTS=0
 MAX_ATTEMPTS=30
 

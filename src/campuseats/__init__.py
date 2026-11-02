@@ -5,6 +5,7 @@ from campuseats.routes.main import main_bp
 from campuseats.extensions import db, login_manager
 from campuseats.models import User, Listing, DietaryTag
 from campuseats.routes.auth import auth_bp
+from campuseats.seed import seed_database
 from campuseats.routes.vendor import vendor_bp
 
 
@@ -36,5 +37,7 @@ def create_app(config_class=Config):
     with app.app_context():
         db.session.execute(text("SELECT 1"))  # fails loudly if the DB is unreachable
         db.create_all()  # builds tables for any models (none exist yet)
+        if app.config.get("SEED_DEMO_USERS"):
+            seed_database()
 
     return app
