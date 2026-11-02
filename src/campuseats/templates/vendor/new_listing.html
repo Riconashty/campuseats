@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Post Surplus Food Listing | CampusEats{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <h1 class="mb-4">Post a Surplus Food Listing</h1>
+        <p class="text-muted">Enter the details of your surplus food so students can find and reserve it before it goes to waste.</p>
+
+        <form method="POST" action="{{ url_for('vendor.new_listing') }}">
+            <!-- Title -->
+            <div class="mb-3">
+                <label for="title" class="form-label fw-semibold">Title *</label>
+                <input type="text"
+                       class="form-control"
+                       id="title"
+                       name="title"
+                       value="{{ form_data.get('title', '') }}"
+                       placeholder="e.g., Assorted Bagels and Pastries"
+                       required>
+            </div>
+
+            <!-- Description -->
+            <div class="mb-3">
+                <label for="description" class="form-label fw-semibold">Description</label>
+                <textarea class="form-control"
+                          id="description"
+                          name="description"
+                          rows="3"
+                          placeholder="Provide details about the food, packaging, or special pickup notes...">{{ form_data.get('description', '') }}</textarea>
+                <div class="form-text">Optional description of the surplus food.</div>
+            </div>
+
+            <!-- Portions Available -->
+            <div class="mb-3">
+                <label for="portions" class="form-label fw-semibold">Number of Portions (1-100) *</label>
+                <input type="number"
+                       class="form-control"
+                       id="portions"
+                       name="portions"
+                       min="1"
+                       max="100"
+                       value="{{ form_data.get('portions', '') }}"
+                       placeholder="e.g., 10"
+                       required>
+            </div>
+
+            <!-- Pickup Location -->
+            <div class="mb-3">
+                <label for="pickup_location" class="form-label fw-semibold">Pickup Location *</label>
+                <input type="text"
+                       class="form-control"
+                       id="pickup_location"
+                       name="pickup_location"
+                       value="{{ form_data.get('pickup_location', '') }}"
+                       placeholder="e.g., Student Center Dining Hall, Counter 2"
+                       required>
+            </div>
+
+            <!-- Dietary Tags -->
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Dietary Tags</label>
+                <div class="border rounded p-3 bg-white">
+                    {% for tag in available_tags %}
+                        <div class="form-check">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   name="dietary_tags"
+                                   value="{{ tag }}"
+                                   id="tag-{{ loop.index }}"
+                                   {% if tag in selected_tags %}checked{% endif %}>
+                            <label class="form-check-label" for="tag-{{ loop.index }}">
+                                {{ tag | capitalize }}
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="form-text">Select all dietary tags that apply to this surplus food.</div>
+            </div>
+
+            <!-- Pickup Window -->
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="pickup_start" class="form-label fw-semibold">Pickup Window Start *</label>
+                    <input type="datetime-local"
+                           class="form-control"
+                           id="pickup_start"
+                           name="pickup_start"
+                           value="{{ form_data.get('pickup_start', '') }}"
+                           required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="pickup_end" class="form-label fw-semibold">Pickup Window End *</label>
+                    <input type="datetime-local"
+                           class="form-control"
+                           id="pickup_end"
+                           name="pickup_end"
+                           value="{{ form_data.get('pickup_end', '') }}"
+                           required>
+                    <div class="form-text">Must be later than start time and not in the past.</div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-primary">Post Listing</button>
+                <a href="{{ url_for('vendor.vendor_listings') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

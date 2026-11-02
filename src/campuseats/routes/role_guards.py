@@ -8,7 +8,6 @@ from flask_login import current_user
 def vendor_required(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
-
         # Returns HTTP 403 error if user is not logged in.
         if not current_user.is_authenticated:
             abort(403)
@@ -25,7 +24,6 @@ def vendor_required(view):
 def student_required(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
-
         # Returns HTTP 403 error if user is not logged in.
         if not current_user.is_authenticated:
             abort(403)
