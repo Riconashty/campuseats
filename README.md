@@ -140,6 +140,11 @@ Open `http://localhost:5001` in your browser. When finished, stop the database w
 ./scripts/stop-db.sh
 ```
 
+When you're finished, stop the database container with:
+```bash
+./scripts/stop-db.sh
+```
+
 ---
 
 ## Development & Verification Workflow

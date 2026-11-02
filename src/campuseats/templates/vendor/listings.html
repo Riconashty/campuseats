@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}My Listings | CampusEats{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>My Surplus Food Listings</h1>
+    <a href="{{ url_for('vendor.new_listing') }}" class="btn btn-primary">
+        Post New Listing
+    </a>
+</div>
+
+{% if not listings %}
+    <div class="card p-5 text-center text-muted bg-white border-dashed">
+        <h3>No Food Listings Posted Yet</h3>
+        <p class="mb-3">You have not posted any surplus food listings. Post food to help students and prevent waste!</p>
+        <div>
+            <a href="{{ url_for('vendor.new_listing') }}" class="btn btn-outline-primary">
+                Post Your First Listing
+            </a>
+        </div>
+    </div>
+{% else %}
+    <div class="table-responsive bg-white rounded shadow-sm border">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Portions Remaining</th>
+                    <th scope="col">Pickup Location</th>
+                    <th scope="col">Pickup Window</th>
+                    <th scope="col">Dietary Tags</th>
+                    <th scope="col">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in listings %}
+                    <tr>
+                        <td>
+                            <strong>{{ item.title }}</strong>
+                            {% if item.description %}
+                                <div class="text-muted small text-truncate" style="max-width: 280px;">
+                                    {{ item.description }}
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">
+                                {{ item.remaining_portions }} / {{ item.total_portions }}
+                            </span>
+                        </td>
+                        <td>{{ item.pickup_location }}</td>
+                        <td class="small">
+                            <div>{{ item.pickup_start.strftime('%b %d, %Y %I:%M %p') }}</div>
+                            <div class="text-muted">to {{ item.pickup_end.strftime('%b %d, %Y %I:%M %p') }}</div>
+                        </td>
+                        <td>
+                            {% for tag in item.tags %}
+                                <span class="badge bg-info text-dark">{{ tag.name | capitalize }}</span>
+                            {% else %}
+                                <span class="text-muted small">None</span>
+                            {% endfor %}
+                        </td>
+                        <td>
+                            {% if item.status == 'active' %}
+                                <span class="badge bg-success">Active</span>
+                            {% elif item.status == 'ended' %}
+                                <span class="badge bg-secondary">Ended</span>
+                            {% elif item.status == 'cancelled' %}
+                                <span class="badge bg-danger">Cancelled</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark">{{ item.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+{% endblock %}

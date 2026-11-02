@@ -46,13 +46,55 @@ until docker exec campuseats-db pg_isready -U campuseats -d campuseats >/dev/nul
 done
 
 if [ ${ATTEMPTS} -eq ${MAX_ATTEMPTS} ]; then
-    echo "Warning: Database startup took longer than expected. Check container logs with 'docker compose logs db'."
+    echo "Error: Database startup took longer than expected. Check container logs with 'docker compose logs db'."
+    exit 1
+fi
+
+echo "Verifying database user credentials and connectivity..."
+DB_USER="${POSTGRES_USER:-campuseats}"
+DB_PASSWORD="${POSTGRES_PASSWORD:-devpassword}"
+DB_NAME="${POSTGRES_DB:-campuseats}"
+
+AUTH_ATTEMPTS=0
+MAX_AUTH_ATTEMPTS=5
+AUTH_OK=false
+AUTH_OUTPUT=""
+
+while [ ${AUTH_ATTEMPTS} -lt ${MAX_AUTH_ATTEMPTS} ]; do
+    if AUTH_OUTPUT=$(docker exec -e PGPASSWORD="${DB_PASSWORD}" campuseats-db psql -U "${DB_USER}" -d "${DB_NAME}" -tAc "SELECT 1;" 2>&1); then
+        if [ "${AUTH_OUTPUT}" = "1" ]; then
+            AUTH_OK=true
+            break
+        fi
+    fi
+    AUTH_ATTEMPTS=$((AUTH_ATTEMPTS + 1))
+    sleep 1
+done
+
+if [ "${AUTH_OK}" = false ]; then
+    echo ""
+    echo "=================================================="
+    echo "Error: Database authentication check failed!"
+    echo "=================================================="
+    echo "The PostgreSQL service is running, but user '${DB_USER}' cannot connect"
+    echo "to database '${DB_NAME}' with the configured credentials."
+    echo ""
+    echo "PostgreSQL reported:"
+    echo "  ${AUTH_OUTPUT}"
+    echo ""
+    echo "This usually happens when an older container was initialized with"
+    echo "different credentials or volume data."
+    echo ""
+    echo "To remove the conflicting container and start fresh with proper credentials:"
+    echo "  docker rm -f campuseats-db"
+    echo "  ./scripts/start-db.sh"
+    echo "=================================================="
     exit 1
 fi
 
 echo "=================================================="
 echo "Database is ready on port 5432!"
-echo "Database: campuseats | User: campuseats"
+echo "Database: ${DB_NAME} | User: ${DB_USER}"
 echo "You can now run: python run.py"
 echo "To stop the database later, run: ./scripts/stop-db.sh"
 echo "=================================================="

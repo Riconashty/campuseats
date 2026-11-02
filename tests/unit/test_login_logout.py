@@ -20,6 +20,7 @@ class LoginLogoutTestCase(unittest.TestCase):
         self.app = create_app(TestingConfig)
         self.client = self.app.test_client()
 
+    # Clean up database resources and close SQLite connections after each test
     def tearDown(self):
         with self.app.app_context():
             db.session.remove()
@@ -450,3 +451,48 @@ class LoginLogoutTestCase(unittest.TestCase):
         # Verify the name and role are displayed
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Test Student (Student)", response.data)
+
+    # Verify that failed login preserves the entered email address in the form
+    def test_failed_login_preserves_email(self):
+        response = self.client.post(
+            "/login",
+            data={"email": "keepme@example.invalid", "password": "WrongPassword!"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'value="keepme@example.invalid"', response.data)
+
+    # Verify that valid next query parameter is honored upon successful login
+    def test_login_handles_next_parameter(self):
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
+        response = self.client.post(
+            "/login?next=/profile",
+            data={"email": "student@example.invalid", "password": "TestPassword123!"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/profile")
+
+    # Verify that external or malicious next redirect URLs are ignored
+    def test_login_ignores_unsafe_next_parameter(self):
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Student",
+                "email": "student@example.invalid",
+                "password": "TestPassword123!",
+                "role": "student",
+            },
+        )
+        response = self.client.post(
+            "/login?next=https://malicious-site.invalid",
+            data={"email": "student@example.invalid", "password": "TestPassword123!"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/listings")
