@@ -5,12 +5,19 @@ from sqlalchemy.exc import OperationalError
 
 from campuseats import create_app
 from campuseats.config import TestingConfig
+from campuseats.extensions import db
 
 
 class HealthDbTest(unittest.TestCase):
     def setUp(self):
         self.app = create_app(TestingConfig)
         self.client = self.app.test_client()
+
+    def tearDown(self):
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+            db.engine.dispose()
 
     def test_health_db_ok(self):
         response = self.client.get("/health/db")
