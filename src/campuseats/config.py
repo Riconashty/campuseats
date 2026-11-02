@@ -16,9 +16,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     PORT = int(os.environ.get("PORT", 5001))
     DEBUG = bool(os.environ.get("DEBUG", False))
+    SEED_DEMO_USERS = os.environ.get("SEED_DEMO_USERS", "false").lower() in ("true", "1", "yes")
 
 
 class TestingConfig(Config):
     TESTING = True
     WTF_CSRF_ENABLED = False
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SEED_DEMO_USERS = False

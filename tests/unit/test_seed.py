@@ -61,6 +61,23 @@ class SeedDatabaseTestCase(unittest.TestCase):
             self.assertEqual(initial_count, subsequent_count)
             self.assertEqual(subsequent_count, 2)
 
+    def test_create_app_seeds_when_configured(self):
+        class SeedConfig(TestingConfig):
+            SEED_DEMO_USERS = True
+
+        app = create_app(SeedConfig)
+        with app.app_context():
+            users = db.session.execute(db.select(User)).scalars().all()
+            self.assertEqual(len(users), 2)
+            db.session.remove()
+            db.drop_all()
+            db.engine.dispose()
+
+    def test_create_app_does_not_seed_by_default_in_testing(self):
+        with self.app.app_context():
+            users = db.session.execute(db.select(User)).scalars().all()
+            self.assertEqual(len(users), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

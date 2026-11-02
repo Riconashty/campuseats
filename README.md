@@ -21,7 +21,7 @@ docker compose up
 Once started, open `http://localhost:5001` in your browser.
 
 ### Automatic Seed Accounts
-On first launch, the database automatically initializes the schema and creates demo accounts for grading:
+On first launch, the database automatically initializes the schema and creates demo accounts for grading (enabled by default in Docker and `.env.example` via `SEED_DEMO_USERS=true`):
 - **Vendor Account:**
   - Email: `vendor@campuseats.edu`
   - Password: `Vendor123!`

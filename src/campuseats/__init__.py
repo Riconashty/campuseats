@@ -34,7 +34,7 @@ def create_app(config_class=Config):
     with app.app_context():
         db.session.execute(text("SELECT 1"))  # fails loudly if the DB is unreachable
         db.create_all()  # builds tables for any models (none exist yet)
-        if not app.config.get("TESTING"):
+        if app.config.get("SEED_DEMO_USERS"):
             seed_database()
 
     return app
