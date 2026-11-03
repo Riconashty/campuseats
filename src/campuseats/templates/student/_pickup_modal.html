@@ -1,0 +1,118 @@
+{% if recent_reservation %}
+<!-- Pickup Code Confirmation Modal -->
+<div class="modal fade show d-block" id="pickupCodeModal" tabindex="-1" role="dialog" aria-labelledby="pickupModalLabel" aria-modal="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content modal-pickup-dialog shadow">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold" id="pickupModalLabel">
+          Reservation Confirmed!
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="closePickupModal()"></button>
+      </div>
+
+      <div class="modal-body p-4">
+        <div class="pickup-code-card mb-4">
+          <div class="text-uppercase small fw-bold text-muted mb-1">Your 6-Character Pickup Code</div>
+          <div class="pickup-code-badge" id="pickup-code-val">{{ recent_reservation.pickup_code }}</div>
+          <div>
+            <button type="button"
+                    class="btn btn-outline-success btn-sm px-3 mt-2 fw-semibold"
+                    id="copy-pickup-code-btn"
+                    onclick="copyPickupCode('{{ recent_reservation.pickup_code }}')">
+              Copy Code
+            </button>
+          </div>
+        </div>
+
+        <h6 class="fw-bold mb-3 text-secondary">Pickup Instructions</h6>
+        <dl class="row pickup-details-list mb-0">
+          <dt class="col-sm-4">Vendor</dt>
+          <dd class="col-sm-8">{{ recent_reservation.listing.vendor.name }}</dd>
+
+          <dt class="col-sm-4">Item</dt>
+          <dd class="col-sm-8">{{ recent_reservation.listing.title }}</dd>
+
+          <dt class="col-sm-4">Portions</dt>
+          <dd class="col-sm-8">
+            <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">
+              {{ recent_reservation.portions_reserved }} {{ 'portion' if recent_reservation.portions_reserved == 1 else 'portions' }}
+            </span>
+          </dd>
+
+          <dt class="col-sm-4">Location</dt>
+          <dd class="col-sm-8">{{ recent_reservation.listing.pickup_location }}</dd>
+
+          <dt class="col-sm-4">Window</dt>
+          <dd class="col-sm-8">
+            {{ recent_reservation.listing.pickup_start.strftime('%b %d, %I:%M %p') }} &ndash;
+            {{ recent_reservation.listing.pickup_end.strftime('%I:%M %p') }}
+          </dd>
+        </dl>
+
+        <div class="alert alert-light border mt-3 mb-0 small text-muted">
+          Show this 6-character code to the campus vendor when arriving at the pickup location during your pickup window.
+        </div>
+      </div>
+
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-success px-4" data-bs-dismiss="modal" onclick="closePickupModal()">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" id="pickupModalBackdrop" onclick="closePickupModal()"></div>
+
+<script>
+  function closePickupModal() {
+    var modal = document.getElementById('pickupCodeModal');
+    var backdrop = document.getElementById('pickupModalBackdrop');
+    if (modal) {
+      modal.classList.remove('d-block');
+      modal.classList.add('d-none');
+    }
+    if (backdrop) {
+      backdrop.remove();
+    }
+  }
+
+  function markCopyButtonSuccess() {
+    var btn = document.getElementById('copy-pickup-code-btn');
+    if (btn) {
+      btn.innerText = 'Copied!';
+      setTimeout(function() {
+        btn.innerText = 'Copy Code';
+      }, 2500);
+    }
+  }
+
+  function fallbackCopyCode(code) {
+    var textarea = document.createElement('textarea');
+    textarea.value = code;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      markCopyButtonSuccess();
+    } catch (err) {}
+    document.body.removeChild(textarea);
+  }
+
+  function copyPickupCode(code) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(markCopyButtonSuccess).catch(function() {
+        fallbackCopyCode(code);
+      });
+    } else {
+      fallbackCopyCode(code);
+    }
+  }
+
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      closePickupModal();
+    }
+  });
+</script>
+{% endif %}
