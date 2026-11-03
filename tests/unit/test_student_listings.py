@@ -63,7 +63,12 @@ class StudentListingsFeedTest(unittest.TestCase):
                 status=status,
             )
             for name in tags:
-                listing.tags.append(DietaryTag(name=name))
+                tag = db.session.execute(
+                    db.select(DietaryTag).filter_by(name=name)
+                ).scalar_one_or_none()
+                if tag is None:
+                    tag = DietaryTag(name=name)
+                listing.tags.append(tag)
             db.session.add(listing)
             db.session.commit()
 
