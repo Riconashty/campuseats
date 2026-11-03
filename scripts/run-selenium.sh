@@ -24,7 +24,7 @@ if curl --silent --fail --max-time 2 "$BASE_URL/" > /dev/null; then
     echo "Server is UP and reachable."
     echo "Starting Selenium black box test suite (Headless Chrome)..."
     echo ""
-    pytest tests/integration/test_us1_selenium.py --no-cov -v -s
+    pytest tests/integration/ --no-cov -v -s
     echo ""
     echo "======================================================================"
     echo " Selenium tests completed successfully!"

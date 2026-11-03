@@ -24,5 +24,12 @@ class User(UserMixin, db.Model):
         cascade="all, delete-orphan",
     )
 
+    # Surplus food reservations made by the user (student role)
+    reservations = db.relationship(
+        "Reservation",
+        back_populates="student",
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self):
         return f"<User {self.name}>"

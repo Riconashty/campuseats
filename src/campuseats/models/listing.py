@@ -56,6 +56,11 @@ class Listing(db.Model):
     )
 
     vendor = db.relationship("User", back_populates="listings")
+    reservations = db.relationship(
+        "Reservation",
+        back_populates="listing",
+        cascade="all, delete-orphan",
+    )
     tags = db.relationship(
         "DietaryTag",
         secondary=listing_dietary_tags,

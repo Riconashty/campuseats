@@ -263,6 +263,10 @@ class TestUS1SeleniumBlackBox(unittest.TestCase):
         )
         self.assertIn("Vendor", navbar.text)
 
-        logout_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Logout')]")
-        logout_button.click()
+        logout_button = WebDriverWait(self.driver, 5).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Logout')]"))
+        )
+        self.driver.execute_script(
+            "arguments[0].scrollIntoView(true); arguments[0].click();", logout_button
+        )
         WebDriverWait(self.driver, 5).until(EC.url_contains("/login"))

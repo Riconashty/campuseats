@@ -1,45 +1,99 @@
 {% extends "base.html" %}
 
-{% block title %}Browse Listings - CampusEats{% endblock %}
+{% block title %}Browse Available Listings | CampusEats{% endblock %}
 
 {% block content %}
-<h1 class="mb-4 fw-bold text-success">Available Food Listings</h1>
+{% include "student/_pickup_modal.html" %}
 
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="fw-bold text-success mb-1">Available Food Listings</h1>
+    <p class="text-muted mb-0">Browse and reserve leftover meals from campus dining halls and cafés before they go to waste.</p>
+  </div>
+  {% if listings %}
+  <div>
+    <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-3 py-2 fs-6">
+      {{ listings|length }} Available {{ 'Listing' if listings|length == 1 else 'Listings' }}
+    </span>
+  </div>
+  {% endif %}
+</div>
+
+{% if listings %}
 <div class="row g-4">
   {% for listing in listings %}
   <div class="col-12 col-md-6 col-lg-4">
-    <div class="card h-100 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title">{{ listing.title }}</h5>
-        <h6 class="card-subtitle mb-2 text-secondary">{{ listing.vendor.name }}</h6>
+    <div class="card listing-card h-100 shadow-sm d-flex flex-column" data-listing-id="{{ listing.id }}">
+      <div class="card-body flex-grow-1">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h5 class="card-title fw-bold text-dark mb-0">{{ listing.title }}</h5>
+          <span class="portions-badge bg-success-subtle text-success-emphasis border border-success-subtle">
+            {{ listing.remaining_portions }} left
+          </span>
+        </div>
 
-        <p class="mb-1"><strong>Location:</strong> {{ listing.pickup_location }}</p>
-        <p class="mb-1"><strong>Portions left:</strong> {{ listing.remaining_portions }}</p>
-        <p class="mb-2">
-          <strong>Pickup:</strong>
+        <h6 class="card-subtitle mb-3 text-secondary">{{ listing.vendor.name }}</h6>
+
+        <p class="mb-1 text-muted small">
+          <strong class="text-dark">Location:</strong> {{ listing.pickup_location }}
+        </p>
+        <p class="mb-1 text-muted small">
+          <strong class="text-dark">Portions left:</strong> {{ listing.remaining_portions }}
+        </p>
+        <p class="mb-2 text-muted small">
+          <strong class="text-dark">Pickup:</strong>
           {{ listing.pickup_start.strftime('%b %d, %I:%M %p') }} to
           {{ listing.pickup_end.strftime('%I:%M %p') }}
         </p>
 
-        <div class="mb-2">
+        {% if listing.description %}
+        <p class="text-muted small mb-3">
+          {{ listing.description }}
+        </p>
+        {% endif %}
+
+        <div class="d-flex flex-wrap gap-1 mb-2">
           {% for tag in listing.tags %}
-          <span class="badge bg-success">{{ tag.name }}</span>
+          <span class="dietary-tag-badge badge bg-success" data-tag="{{ tag.name }}">{{ tag.name | capitalize }}</span>
           {% endfor %}
         </div>
+
+        {% if active_reservations_by_listing.get(listing.id) %}
+        <div class="mt-2">
+          <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">
+            Reserved &bull; Code: <strong>{{ active_reservations_by_listing.get(listing.id).pickup_code }}</strong>
+          </span>
+        </div>
+        {% endif %}
       </div>
 
       <div class="card-footer bg-transparent">
-        {# Placeholder for portion selection and reserve action (built in SCRUM-29). #}
-        <div class="reserve-area" data-listing-id="{{ listing.id }}"></div>
+        <div class="reserve-area" data-listing-id="{{ listing.id }}">
+          <form method="POST" action="{{ url_for('student.reserve_listing', listing_id=listing.id) }}" class="reserve-form">
+            <div class="d-flex align-items-center gap-2">
+              <label class="visually-hidden" for="portions-{{ listing.id }}">Select Portions</label>
+              <select name="portions" id="portions-{{ listing.id }}" class="form-select form-select-sm" style="max-width: 140px;" aria-label="Portions to reserve">
+                <option value="1">1 Portion</option>
+                <option value="2">2 Portions</option>
+              </select>
+              <button type="submit" class="btn btn-success btn-sm px-3 fw-semibold flex-grow-1 reserve-submit-btn">
+                Reserve
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
-  </div>
-  {% else %}
-  <div class="col-12">
-    <div class="alert alert-info text-center">
-      No food is available right now. Check back soon!
     </div>
   </div>
   {% endfor %}
 </div>
+{% else %}
+<div class="col-12">
+  <div class="alert alert-info text-center p-4">
+    <h4 class="alert-heading fw-bold">No Food Listings Available</h4>
+    <p class="mb-0">No food is available right now. Check back soon!</p>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
+
