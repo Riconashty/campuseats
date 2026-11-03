@@ -33,26 +33,29 @@ def listings():
     )
 
     # Map current student's active reservations by listing for convenient card status display
-    active_reservations = (
-        db.session.execute(
-            db.select(Reservation).filter_by(
-                student_id=current_user.id,
-                status="active",
+    user_id = getattr(current_user, "id", None)
+    active_reservations_by_listing = {}
+    if user_id:
+        active_reservations = (
+            db.session.execute(
+                db.select(Reservation).filter_by(
+                    student_id=user_id,
+                    status="active",
+                )
             )
+            .scalars()
+            .all()
         )
-        .scalars()
-        .all()
-    )
-    active_reservations_by_listing = {res.listing_id: res for res in active_reservations}
+        active_reservations_by_listing = {res.listing_id: res for res in active_reservations}
 
     # Check for freshly created reservation to display in pickup confirmation modal
     recent_reservation_id = session.pop("recent_reservation_id", None)
     recent_reservation = None
-    if recent_reservation_id:
+    if recent_reservation_id and user_id:
         recent_reservation = db.session.execute(
             db.select(Reservation)
             .options(selectinload(Reservation.listing).selectinload(Listing.vendor))
-            .filter_by(id=recent_reservation_id, student_id=current_user.id)
+            .filter_by(id=recent_reservation_id, student_id=user_id)
         ).scalar_one_or_none()
 
     return render_template(
@@ -88,9 +91,10 @@ def reserve_listing(listing_id):
         return redirect(url_for("student.listings"))
 
     # Enforce that a student may only hold one active reservation per listing
+    user_id = getattr(current_user, "id", None)
     existing_active = db.session.execute(
         db.select(Reservation).filter_by(
-            student_id=current_user.id,
+            student_id=user_id,
             listing_id=listing.id,
             status="active",
         )
@@ -113,7 +117,7 @@ def reserve_listing(listing_id):
         listing.remaining_portions -= portions
 
         new_reservation = Reservation(
-            student_id=current_user.id,
+            student_id=user_id,
             listing_id=listing.id,
             portions_reserved=portions,
             pickup_code=pickup_code,
