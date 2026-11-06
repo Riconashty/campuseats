@@ -1,6 +1,7 @@
 from datetime import datetime
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user
+from sqlalchemy import case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
@@ -134,3 +135,59 @@ def reserve_listing(listing_id):
     session["recent_reservation_id"] = new_reservation.id
     flash(f"Reservation confirmed! Your pickup code is {pickup_code}.", "success")
     return redirect(url_for("student.listings"))
+
+
+@student_bp.route("/student/reservations", methods=["GET"])
+@student_required
+def my_reservations():
+    reservations = (
+        db.session.execute(
+            db.select(Reservation)
+            .options(selectinload(Reservation.listing).selectinload(Listing.vendor))
+            .filter_by(student_id=current_user.id)
+            .order_by(
+                case((Reservation.status == "active", 0), else_=1),
+                Reservation.created_at.desc(),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return render_template(
+        "student/my_reservations.html",
+        reservations=reservations,
+        now=datetime.now(),
+    )
+
+
+@student_bp.route("/student/reservations/<int:reservation_id>/cancel", methods=["POST"])
+@student_required
+def cancel_reservation(reservation_id):
+    # Lock the reservation first so two simultaneous cancels cannot both succeed
+    reservation = db.session.execute(
+        db.select(Reservation).filter_by(id=reservation_id).with_for_update()
+    ).scalar_one_or_none()
+
+    if reservation is None:
+        db.session.rollback()
+        abort(404)
+    if reservation.student_id != current_user.id:
+        db.session.rollback()
+        abort(403)
+
+    # Then lock the listing, the same way reserve_listing does
+    listing = db.session.execute(
+        db.select(Listing).filter_by(id=reservation.listing_id).with_for_update()
+    ).scalar_one()
+
+    if reservation.status != "active" or listing.pickup_end <= datetime.now():
+        db.session.rollback()
+        flash("This reservation can no longer be cancelled.", "danger")
+        return redirect(url_for("student.my_reservations"))
+
+    reservation.status = "cancelled"
+    listing.remaining_portions += reservation.portions_reserved
+    db.session.commit()
+
+    flash("Reservation cancelled. Your portions were released.", "success")
+    return redirect(url_for("student.my_reservations"))
