@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Pickup | CampusEats{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <h1 class="mb-4">Confirm Pickup</h1>
+
+        <p class="text-muted">
+            Enter the student's 6-character pickup code
+            to confirm their reservation.
+        </p>
+
+        <form method="POST" action="{{ url_for('vendor.confirm_pickup') }}">
+
+            <!-- Pickup Code -->
+            <div class="mb-3">
+                <label for="pickup_code" class="form-label fw-semibold">
+                    Pickup Code *
+                </label>
+
+                <input type="text"
+                       class="form-control"
+                       id="pickup_code"
+                       name="pickup_code"
+                       minlength="6"
+                       maxlength="6"
+                       pattern="[A-Za-z0-9]{6}"
+                       placeholder="e.g., ABC123"
+                       autocomplete="off"
+                       required>
+
+                <div class="form-text">
+                    Enter the 6-character code provided by the student.
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-primary">
+                    Confirm Pickup
+                </button>
+
+                <a href="{{ url_for('vendor.vendor_listings') }}"
+                   class="btn btn-outline-secondary">
+                    Cancel
+                </a>
+            </div>
+
+        </form>
+
+        <!-- Successful Pickup Confirmation -->
+        {% if confirmed_reservation %}
+        <div class="card border-success mt-4">
+            <div class="card-header bg-success text-white">
+                Pickup Confirmed!
+            </div>
+
+            <div class="card-body">
+                <p class="mb-2">
+                    <strong>Student:</strong>
+                    {{ confirmed_reservation.student.name }}
+                </p>
+
+                <p class="mb-2">
+                    <strong>Portions to Hand Out:</strong>
+                    {{ confirmed_reservation.portions_reserved }}
+                </p>
+
+                <p class="mb-0">
+                    <strong>Status:</strong>
+                    <span class="badge bg-success">Picked Up</span>
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

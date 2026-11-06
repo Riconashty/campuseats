@@ -150,4 +150,62 @@ def new_listing():
 @vendor_bp.route("/vendor/confirm-pickup", methods=["GET", "POST"])
 @vendor_required
 def confirm_pickup():
+    if request.method == "POST":
+        pickup_code = request.form.get("pickup_code", "").strip().upper()
+
+        # Validate pickup code format
+        if len(pickup_code) != 6 or not pickup_code.isascii() or not pickup_code.isalnum():
+            flash("Pickup code must contain exactly 6 letters or numbers.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Find reservation by pickup code
+        reservation = db.session.execute(
+            db.select(Reservation).filter_by(pickup_code=pickup_code)
+        ).scalar_one_or_none()
+
+        # Check whether the pickup code exists
+        if reservation is None:
+            flash("Pickup code not found.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Verify reservation belongs to the logged-in vendor
+        if reservation.listing.vendor_id != current_user.id:
+            flash("This reservation belongs to another vendor's listing.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Verify the reservation is still active
+        if reservation.status != "active":
+            flash(
+                f"Cannot confirm pickup. Reservation status is '{reservation.status}'.",
+                "danger",
+            )
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Check the listing's pickup window
+        listing = reservation.listing
+        now = datetime.now()
+
+        # Pickup window has not started yet
+        if now < listing.pickup_start:
+            flash("The pickup window has not started yet.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Pickup window has already ended
+        if now > listing.pickup_end:
+            reservation.status = "no-show"
+            db.session.commit()
+
+            flash("The pickup window has ended. Reservation marked as no-show.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Confirm pickup
+        reservation.status = "picked up"
+        db.session.commit()
+
+        # Display pickup confirmation
+        return render_template(
+            "vendor/confirm_pickup.html",
+            confirmed_reservation=reservation,
+        )
+
     return render_template("vendor/confirm_pickup.html")
