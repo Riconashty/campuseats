@@ -4,6 +4,7 @@ from flask_login import current_user
 
 from campuseats.extensions import db
 from campuseats.models.listing import DEFAULT_DIETARY_TAGS, DietaryTag, Listing
+from campuseats.models.reservation import Reservation
 from campuseats.routes.role_guards import vendor_required
 
 vendor_bp = Blueprint("vendor", __name__)
@@ -144,3 +145,9 @@ def new_listing():
         selected_tags=[],
         form_data={},
     )
+
+
+@vendor_bp.route("/vendor/confirm-pickup", methods=["GET", "POST"])
+@vendor_required
+def confirm_pickup():
+    return render_template("vendor/confirm_pickup.html")
