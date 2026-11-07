@@ -29,8 +29,8 @@
         <td>{{ r.listing.vendor.name }}</td>
         <td>{{ r.listing.pickup_location }}</td>
         <td>
-          {{ r.listing.pickup_start.strftime('%b %d, %I:%M %p') }} to
-          {{ r.listing.pickup_end.strftime('%I:%M %p') }}
+            {{ r.listing.pickup_start.strftime('%b %d, %I:%M %p') }} to
+            {{ r.listing.pickup_end.strftime('%b %d, %I:%M %p') }}
         </td>
         <td>{{ r.portions_reserved }}</td>
         <td><code class="fs-6">{{ r.pickup_code }}</code></td>
