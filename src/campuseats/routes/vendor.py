@@ -1,6 +1,7 @@
 from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
+from sqlalchemy.orm import selectinload
 
 from campuseats.extensions import db
 from campuseats.models.listing import DEFAULT_DIETARY_TAGS, DietaryTag, Listing
@@ -147,6 +148,18 @@ def new_listing():
     )
 
 
+def expire_passed_reservations_for_listing(listing, now=None):
+    """Transition any active reservations to no-show for a listing whose pickup window ended."""
+    if now is None:
+        now = datetime.now()
+
+    if now > listing.pickup_end:
+        active_reservations = [res for res in listing.reservations if res.status == "active"]
+        for res in active_reservations:
+            res.status = "no-show"
+        db.session.commit()
+
+
 @vendor_bp.route("/vendor/confirm-pickup", methods=["GET", "POST"])
 @vendor_required
 def confirm_pickup():
@@ -158,9 +171,14 @@ def confirm_pickup():
             flash("Pickup code must contain exactly 6 letters or numbers.", "danger")
             return redirect(url_for("vendor.confirm_pickup"))
 
-        # Find reservation by pickup code
+        # Find reservation by pickup code with eager loaded relationships
         reservation = db.session.execute(
-            db.select(Reservation).filter_by(pickup_code=pickup_code)
+            db.select(Reservation)
+            .options(
+                selectinload(Reservation.listing),
+                selectinload(Reservation.student),
+            )
+            .filter_by(pickup_code=pickup_code)
         ).scalar_one_or_none()
 
         # Check whether the pickup code exists
@@ -192,9 +210,7 @@ def confirm_pickup():
 
         # Pickup window has already ended
         if now > listing.pickup_end:
-            reservation.status = "no-show"
-            db.session.commit()
-
+            expire_passed_reservations_for_listing(listing, now=now)
             flash("The pickup window has ended. Reservation marked as no-show.", "danger")
             return redirect(url_for("vendor.confirm_pickup"))
 
