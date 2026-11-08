@@ -28,3 +28,31 @@ class ConfirmPickupTestCase(unittest.TestCase):
         response = self.client.get("/vendor/confirm-pickup")
 
         self.assertEqual(response.status_code, 403)
+
+    def test_vendor_can_access_confirm_pickup(self):
+        # Register a test vendor
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Vendor",
+                "email": "testvendor@example.invalid",
+                "password": "Password123!",
+                "role": "vendor",
+            },
+        )
+
+        # Log in as the vendor
+        self.client.post(
+            "/login",
+            data={
+                "email": "testvendor@example.invalid",
+                "password": "Password123!",
+            },
+        )
+
+        # Access the pickup confirmation page
+        response = self.client.get("/vendor/confirm-pickup")
+
+        # Verify the vendor can access the page
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Confirm Pickup", response.data)
