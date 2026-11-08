@@ -25,6 +25,6 @@ class ConfirmPickupTestCase(unittest.TestCase):
 
     def test_anonymous_user_cannot_access_confirm_pickup(self):
         #verify that users must be authenticated vendors
-        response = self.client.get("/vendor/confirm_pickup")
-        
+        response = self.client.get("/vendor/confirm-pickup")
+
         self.assertEqual(response.status_code, 403)
