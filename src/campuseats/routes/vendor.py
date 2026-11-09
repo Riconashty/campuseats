@@ -181,14 +181,9 @@ def confirm_pickup():
             .filter_by(pickup_code=pickup_code)
         ).scalar_one_or_none()
 
-        # Check whether the pickup code exists
-        if reservation is None:
-            flash("Pickup code not found.", "danger")
-            return redirect(url_for("vendor.confirm_pickup"))
-
-        # Verify reservation belongs to the logged-in vendor
-        if reservation.listing.vendor_id != current_user.id:
-            flash("This reservation belongs to another vendor's listing.", "danger")
+        # Check whether the pickup code exists and belongs to the logged-in vendor
+        if reservation is None or reservation.listing.vendor_id != current_user.id:
+            flash("Invalid code.", "danger")
             return redirect(url_for("vendor.confirm_pickup"))
 
         # Verify the reservation is still active

@@ -177,7 +177,7 @@ class ConfirmPickupTestCase(unittest.TestCase):
             )
 
     def test_pickup_code_not_found(self):
-        # Verify that non-existent pickup codes are rejected cleanly
+        # Verify that non-existent pickup codes are rejected cleanly with a generic invalid message
         self._create_and_login_user(
             name="Lookup Vendor",
             email="vendor_lookup@example.invalid",
@@ -191,10 +191,10 @@ class ConfirmPickupTestCase(unittest.TestCase):
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Pickup code not found.", response.data)
+        self.assertIn(b"Invalid code.", response.data)
 
     def test_pickup_code_belonging_to_another_vendor(self):
-        # Verify that vendors cannot confirm pickups for other vendors listings
+        # Verify that vendors cannot confirm pickups for other vendors listings and receive generic invalid message
         self._create_test_data(
             vendor_email="owner_vendor@example.invalid",
             student_email="student_other@example.invalid",
@@ -215,10 +215,7 @@ class ConfirmPickupTestCase(unittest.TestCase):
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            b"This reservation belongs to another vendor&#39;s listing.",
-            response.data,
-        )
+        self.assertIn(b"Invalid code.", response.data)
 
         # Confirm reservation status remains active in database
         with self.app.app_context():
