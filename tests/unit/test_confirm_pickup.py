@@ -445,7 +445,10 @@ class ConfirmPickupTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Pickup Confirmed!", response.data)
         self.assertIn(b"Jordan Baker", response.data)
-        self.assertIn(b"2", response.data)
+        self.assertRegex(
+            response.get_data(as_text=True),
+            r"Portions to Hand Out:(?:\s|<[^>]+>)*2\b",
+        )
         self.assertIn(b"Delicious Calzones", response.data)
         self.assertIn(b"Picked Up", response.data)
 
