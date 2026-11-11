@@ -49,7 +49,7 @@
                         </td>
                         <td class="portions-total">{{ item.total_portions }}</td>
                         <td class="portions-reserved">{{ item.reserved_portions }}</td>
-                        <td class="portions-remaining">{{ item.remaining_portions }}</td>
+                        <td class="portions-remaining">{% if item.display_status == 'cancelled' %}&mdash;{% else %}{{ item.remaining_portions }}{% endif %}</td>
                     
                         <td>{{ item.pickup_location }}</td>
                         <td class="small">

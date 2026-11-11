@@ -70,7 +70,7 @@ def _validate_listing_form(form):
 def _resolve_dietary_tags(selected_tags):
     # Resolve validated dietary tags
     tags_to_attach = []
-    for tag_name in selected_tags:
+    for tag_name in set(selected_tags):
         tag_name_clean = tag_name.strip().lower()
         if tag_name_clean in DEFAULT_DIETARY_TAGS:
             tag = db.session.execute(

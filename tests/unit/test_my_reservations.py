@@ -134,6 +134,27 @@ class MyReservationsTest(unittest.TestCase):
         self.client.post(self.cancel_url(rid))
         self.assertEqual(self.state(rid, lid), ("cancelled", 2))
 
+    def test_cancel_rechecks_reservation_after_locking_listing(self):
+        rid, lid = self.make_reservation(self.alice_id, "AAAAAA", portions=1, remaining=2)
+        self.login_as(self.alice_id)
+        real_execute = db.session.execute
+
+        def vendor_cancels_first(statement, *args, **kwargs):
+            # Simulate the vendor's cancel landing while this request waits for the listing lock:
+            # the row changes in the database, but the object read earlier still says "active"
+            real_execute(
+                db.update(Reservation).where(Reservation.id == rid).values(status="cancelled"),
+                execution_options={"synchronize_session": False},
+            )
+            return real_execute(statement, *args, **kwargs)
+
+        with patch.object(db.session, "execute", side_effect=vendor_cancels_first):
+            response = self.client.post(self.cancel_url(rid))
+
+        self.assertEqual(response.status_code, 302)
+        # The portion must not be released a second time
+        self.assertEqual(self.state(rid, lid)[1], 2)
+
     def test_cannot_cancel_another_students_reservation(self):
         rid, lid = self.make_reservation(self.bob_id, "BBBBBB", remaining=2)
         self.login_as(self.alice_id)

@@ -34,7 +34,7 @@
                 <td>{{ res.student.name }}</td>
                 <td>{{ res.student.email }}</td>
                 <td>{{ res.portions_reserved }}</td>
-                <td><span class="badge bg-{{ badge_colors.get(res.status, 'secondary') }}">{{ res.status }}</span></td>
+                <td><span class="badge bg-{{ badge_colors.get(res.status, 'secondary') }}">{{ res.status | capitalize }}</span></td>
             </tr>
             {% endfor %}
         </tbody>

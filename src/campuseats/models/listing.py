@@ -71,9 +71,6 @@ class Listing(db.Model):
 
     @property
     def reserved_portions(self):
-        """
-        Portions held by reservationsthat have not been cancelled
-        """
         return self.total_portions - self.remaining_portions
 
     @property

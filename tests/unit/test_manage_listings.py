@@ -138,7 +138,7 @@ class ManageListingsTestCase(unittest.TestCase):
         self.assertNotIn("Not Mine", body)
         self.assertIn('<td class="portions-total">10</td>', body)
         self.assertIn('<td class="portions-reserved">3</td>', body)
-        self.assertIn('<td class="portions-remaining">7</td>', body)
+        self.assertIn('<td class="portions-remaining">&mdash;</td>', body)
 
     def test_dashboard_hides_edit_and_cancel_for_inactive_listings(self):
         active = self.make_listing(title="Active Meal")
