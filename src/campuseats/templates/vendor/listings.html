@@ -5,9 +5,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>My Surplus Food Listings</h1>
-    <a href="{{ url_for('vendor.new_listing') }}" class="btn btn-primary">
-        Post New Listing
-    </a>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('vendor.confirm_pickup') }}" class="btn btn-outline-success">
+            Confirm Pickup
+        </a>
+        <a href="{{ url_for('vendor.new_listing') }}" class="btn btn-primary">
+            Post New Listing
+        </a>
+    </div>
 </div>
 
 {% if not listings %}

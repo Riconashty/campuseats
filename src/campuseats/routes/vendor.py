@@ -1,9 +1,11 @@
 from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
+from sqlalchemy.orm import selectinload
 
 from campuseats.extensions import db
 from campuseats.models.listing import DEFAULT_DIETARY_TAGS, DietaryTag, Listing
+from campuseats.models.reservation import Reservation
 from campuseats.routes.role_guards import vendor_required
 
 vendor_bp = Blueprint("vendor", __name__)
@@ -144,3 +146,82 @@ def new_listing():
         selected_tags=[],
         form_data={},
     )
+
+
+def expire_passed_reservations_for_listing(listing, now=None):
+    """Transition any active reservations to no-show for a listing whose pickup window ended."""
+    if now is None:
+        now = datetime.now()
+
+    if now > listing.pickup_end:
+        active_reservations = [res for res in listing.reservations if res.status == "active"]
+        for res in active_reservations:
+            res.status = "no-show"
+        db.session.commit()
+
+
+@vendor_bp.route("/vendor/confirm-pickup", methods=["GET", "POST"])
+@vendor_required
+def confirm_pickup():
+    if request.method == "POST":
+        pickup_code = request.form.get("pickup_code", "").strip().upper()
+
+        # Validate pickup code format
+        if len(pickup_code) != 6 or not pickup_code.isascii() or not pickup_code.isalnum():
+            flash("Pickup code must contain exactly 6 letters or numbers.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Find reservation by pickup code with eager loaded relationships
+        reservation = db.session.execute(
+            db.select(Reservation)
+            .options(
+                selectinload(Reservation.listing),
+                selectinload(Reservation.student),
+            )
+            .filter_by(pickup_code=pickup_code)
+            # Lock the reservation row for update to prevent race conditions
+            .with_for_update(of=Reservation)
+        ).scalar_one_or_none()
+
+        # Check whether the pickup code exists and belongs to the logged-in vendor
+        if reservation is None or reservation.listing.vendor_id != current_user.id:
+            db.session.rollback()
+            flash("Invalid code.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Verify the reservation is still active
+        if reservation.status != "active":
+            db.session.rollback()
+            flash(
+                f"Cannot confirm pickup. Reservation status is '{reservation.status}'.",
+                "danger",
+            )
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Check the listing's pickup window
+        listing = reservation.listing
+        now = datetime.now()
+
+        # Pickup window has not started yet
+        if now < listing.pickup_start:
+            db.session.rollback()
+            flash("The pickup window has not started yet.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Pickup window has already ended
+        if now > listing.pickup_end:
+            expire_passed_reservations_for_listing(listing, now=now)
+            flash("The pickup window has ended. Reservation marked as no-show.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
+        # Confirm pickup
+        reservation.status = "picked up"
+        db.session.commit()
+
+        # Display pickup confirmation
+        return render_template(
+            "vendor/confirm_pickup.html",
+            confirmed_reservation=reservation,
+        )
+
+    return render_template("vendor/confirm_pickup.html")
