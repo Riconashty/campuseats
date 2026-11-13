@@ -394,46 +394,36 @@ def vendor_dashboard():
     # Retrieve the filtered listings
     listings = db.session.execute(query.order_by(Listing.created_at.desc())).scalars().all()
 
-    # count the total number of listings posted
-    total_listings_posted = len(listings)
+    # Calculate listing counts and portions using SQLAlchemy
+    total_listings_posted, total_portions_posted = db.session.execute(
+        query.with_only_columns(
+            db.func.count(Listing.id),
+            db.func.coalesce(db.func.sum(Listing.total_portions), 0),
+        )
+    ).one()
 
     # Calculate total portions posted
     total_portions_posted = sum(listing.total_portions for listing in listings)
 
-    # Calculate total portions picked up
-    total_portions_picked_up = sum(
-        sum(
-            reservation.portions_reserved
-            for reservation in listing.reservations
-            if reservation.status == "picked up"
+    # Calculate reservation totals using SQLAlchemy
+    reservation_totals = db.session.execute(
+        db.select(
+            Reservation.status,
+            db.func.count(Reservation.id),
+            db.func.coalesce(db.func.sum(Reservation.portions_reserved), 0),
         )
-        for listing in listings
-    )
+        .where(Reservation.listing_id.in_(query.with_only_columns(Listing.id)))
+        .group_by(Reservation.status)
+    ).all()
 
-    # Calculate total of no-show portions
-    total_no_show_portions = sum(
-        sum(
-            reservation.portions_reserved
-            for reservation in listing.reservations
-            if reservation.status == "no-show"
-        )
-        for listing in listings
-    )
+    # Organize reservation counts and portions by status
+    reservation_counts = {status: count for status, count, portions in reservation_totals}
+    reservation_portions = {status: portions for status, count, portions in reservation_totals}
 
-    # Calculate total portions reserved by students
-    total_portions_reserved = sum(
-        reservation.portions_reserved
-        for listing in listings
-        for reservation in listing.reservations
-    )
-
-    # count the number of no-show reservations
-    total_no_show_reservations = sum(
-        1
-        for listing in listings
-        for reservation in listing.reservations
-        if reservation.status == "no-show"
-    )
+    total_portions_picked_up = reservation_portions.get("picked up", 0)
+    total_no_show_portions = reservation_portions.get("no-show", 0)
+    total_no_show_reservations = reservation_counts.get("no-show", 0)
+    total_portions_reserved = sum(reservation_portions.values())
 
     # calculate the no-show rate as percentage
     if total_portions_reserved > 0:
