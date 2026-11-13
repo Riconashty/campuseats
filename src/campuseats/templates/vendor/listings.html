@@ -36,6 +36,7 @@
                     <th scope="col">Pickup Window</th>
                     <th scope="col">Dietary Tags</th>
                     <th scope="col">Status</th>
+                    <th scope="col">Rating & Reviews</th>
                 </tr>
             </thead>
             <tbody>
@@ -75,6 +76,40 @@
                                 <span class="badge bg-danger">Cancelled</span>
                             {% else %}
                                 <span class="badge bg-light text-dark">{{ item.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.average_rating is not none %}
+                                <div>
+                                    <span class="text-warning">★</span>
+                                    <strong>{{ "%.1f"|format(item.average_rating) }}</strong> / 5.0
+                                    <span class="text-muted small">({{ item.ratings|length }})</span>
+                                </div>
+                            {% else %}
+                                <div class="text-muted small">No ratings yet</div>
+                            {% endif %}
+
+                            {% if item.reviews_with_comments %}
+                                <div class="mt-1">
+                                    <details>
+                                        <summary class="small text-primary" style="cursor: pointer;">
+                                            {{ item.reviews_with_comments|length }} review comment{% if item.reviews_with_comments|length != 1 %}s{% endif %}
+                                        </summary>
+                                        <ul class="list-unstyled small mt-2 mb-0 border-top pt-2" style="max-width: 320px;">
+                                            {% for r in item.reviews_with_comments %}
+                                                <li class="mb-2 text-wrap text-break">
+                                                    <span class="badge bg-warning text-dark">{{ r.stars }} ★</span>
+                                                    {% if r.created_at %}
+                                                        <span class="text-muted small">({{ r.created_at.strftime('%b %d, %Y') }}):</span>
+                                                    {% endif %}
+                                                    <span class="fst-italic">"{{ r.comment }}"</span>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </details>
+                                </div>
+                            {% else %}
+                                <div class="text-muted small">No comments</div>
                             {% endif %}
                         </td>
                     </tr>
