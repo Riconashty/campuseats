@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy.orm import selectinload
@@ -49,7 +49,18 @@ def _validate_listing_form(form):
     except ValueError:
         return None, "Please provide valid dates and times for the pickup window."
 
-    if pickup_end < datetime.now():
+    if pickup_start.tzinfo is None:
+        pickup_start = pickup_start.astimezone(timezone.utc)
+    else:
+        pickup_start = pickup_start.astimezone(timezone.utc)
+
+    if pickup_end.tzinfo is None:
+        pickup_end = pickup_end.astimezone(timezone.utc)
+    else:
+        pickup_end = pickup_end.astimezone(timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    if pickup_end < now:
         return None, "Pickup end time cannot be in the past."
 
     if pickup_end <= pickup_start:
@@ -273,7 +284,7 @@ def new_listing():
 def expire_passed_reservations_for_listing(listing, now=None):
     """Transition any active reservations to no-show for a listing whose pickup window ended."""
     if now is None:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
     if now > listing.pickup_end:
         active_reservations = [res for res in listing.reservations if res.status == "active"]
@@ -322,7 +333,7 @@ def confirm_pickup():
 
         # Check the listing's pickup window
         listing = reservation.listing
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         # Pickup window has not started yet
         if now < listing.pickup_start:

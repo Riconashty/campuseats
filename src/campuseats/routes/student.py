@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user
 from sqlalchemy import case
@@ -17,7 +17,7 @@ student_bp = Blueprint("student", __name__)
 @student_required
 def listings():
     # Retrieve active surplus food listings whose pickup windows have not yet elapsed
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     available_listings = (
         db.session.execute(
             db.select(Listing)
@@ -85,7 +85,7 @@ def reserve_listing(listing_id):
         db.select(Listing).filter_by(id=listing_id).with_for_update()
     ).scalar_one_or_none()
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     if listing is None or listing.status != "active" or listing.pickup_end <= now:
         db.session.rollback()
         flash("This listing is no longer available for reservation.", "danger")
@@ -156,7 +156,7 @@ def my_reservations():
     return render_template(
         "student/my_reservations.html",
         reservations=reservations,
-        now=datetime.now(),
+        now=datetime.now(timezone.utc),
     )
 
 
@@ -181,7 +181,7 @@ def cancel_reservation(reservation_id):
     # cancelled it while this one was waiting for the lock
     db.session.refresh(reservation)
 
-    if reservation.status != "active" or listing.pickup_end <= datetime.now():
+    if reservation.status != "active" or listing.pickup_end <= datetime.now(timezone.utc):
         db.session.rollback()
         flash("This reservation can no longer be cancelled.", "danger")
         return redirect(url_for("student.my_reservations"))

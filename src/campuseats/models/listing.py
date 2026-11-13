@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from campuseats.extensions import db
 
@@ -9,6 +9,26 @@ DEFAULT_DIETARY_TAGS = (
     "halal",
     "contains nuts",
 )
+
+
+class UTCDateTime(db.TypeDecorator):
+    """DateTime type that standardizes storage and retrieval using timezone-aware UTC timestamps."""
+
+    impl = db.DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            if value.tzinfo is None:
+                return value.astimezone(timezone.utc)
+            return value.astimezone(timezone.utc)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
 
 # Association table between listings and dietary tags
 listing_dietary_tags = db.Table(
@@ -48,8 +68,8 @@ class Listing(db.Model):
     total_portions = db.Column(db.Integer, nullable=False)
     remaining_portions = db.Column(db.Integer, nullable=False)
     pickup_location = db.Column(db.String(255), nullable=False)
-    pickup_start = db.Column(db.DateTime, nullable=False)
-    pickup_end = db.Column(db.DateTime, nullable=False)
+    pickup_start = db.Column(UTCDateTime, nullable=False)
+    pickup_end = db.Column(UTCDateTime, nullable=False)
     status = db.Column(db.String(20), nullable=False, default="active", server_default="active")
     created_at = db.Column(
         db.DateTime(timezone=True),
@@ -75,8 +95,12 @@ class Listing(db.Model):
 
     @property
     def display_status(self):
-        if self.status == "active" and self.pickup_end <= datetime.now():
-            return "ended"
+        end = self.pickup_end
+        if end is not None:
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
+            if self.status == "active" and end <= datetime.now(timezone.utc):
+                return "ended"
         return self.status
 
     def __repr__(self):

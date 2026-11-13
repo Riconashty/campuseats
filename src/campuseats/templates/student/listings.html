@@ -43,7 +43,11 @@
         <p class="mb-2 text-muted small">
           <strong class="text-dark">Pickup:</strong>
           {{ listing.pickup_start.strftime('%b %d, %I:%M %p') }} to
+          {% if listing.pickup_start.date() != listing.pickup_end.date() %}
+          {{ listing.pickup_end.strftime('%b %d, %I:%M %p') }}
+          {% else %}
           {{ listing.pickup_end.strftime('%I:%M %p') }}
+          {% endif %}
         </p>
 
         {% if listing.description %}

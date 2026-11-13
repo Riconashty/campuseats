@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -50,8 +50,15 @@ class StudentListingsFeedTest(unittest.TestCase):
             self.vendor_id = vendor.id
 
     def add_listing(self, title, hours_until_end=2, remaining=3, status="active", tags=()):
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         with self.app.app_context():
+            resolved_tags = []
+            for name in tags:
+                tag = db.session.execute(
+                    db.select(DietaryTag).filter_by(name=name)
+                ).scalar_one_or_none() or DietaryTag(name=name)
+                resolved_tags.append(tag)
+
             listing = Listing(
                 vendor_id=self.vendor_id,
                 title=title,
@@ -61,14 +68,8 @@ class StudentListingsFeedTest(unittest.TestCase):
                 pickup_start=now - timedelta(hours=3),
                 pickup_end=now + timedelta(hours=hours_until_end),
                 status=status,
+                tags=resolved_tags,
             )
-            for name in tags:
-                tag = db.session.execute(
-                    db.select(DietaryTag).filter_by(name=name)
-                ).scalar_one_or_none()
-                if tag is None:
-                    tag = DietaryTag(name=name)
-                listing.tags.append(tag)
             db.session.add(listing)
             db.session.commit()
 
@@ -107,3 +108,40 @@ class StudentListingsFeedTest(unittest.TestCase):
         self.add_listing("Sooner Meal", hours_until_end=1)
         body = self.get_feed().data
         self.assertLess(body.index(b"Sooner Meal"), body.index(b"Later Meal"))
+
+    def test_overnight_pickup_window_renders_end_date(self):
+        now = datetime.now(timezone.utc)
+        with self.app.app_context():
+            listing = Listing(
+                vendor_id=self.vendor_id,
+                title="Midnight Snacks",
+                total_portions=4,
+                remaining_portions=4,
+                pickup_location="Night Cafe",
+                pickup_start=now.replace(hour=23, minute=0, second=0, microsecond=0),
+                pickup_end=(now + timedelta(days=1)).replace(
+                    hour=2, minute=0, second=0, microsecond=0
+                ),
+                status="active",
+            )
+            db.session.add(listing)
+            db.session.commit()
+
+        response = self.get_feed()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Midnight Snacks", response.data)
+        expected_end_formatted = (
+            (now + timedelta(days=1))
+            .replace(hour=2, minute=0, second=0, microsecond=0)
+            .strftime("%b %d, %I:%M %p")
+            .encode("utf-8")
+        )
+        self.assertIn(expected_end_formatted, response.data)
+
+    def test_multi_listing_reuse_dietary_tag_avoids_collision(self):
+        self.add_listing("Vegan Lunch", tags=["vegan", "halal"])
+        self.add_listing("Vegan Dinner", tags=["vegan", "vegetarian"])
+        response = self.get_feed()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Vegan Lunch", response.data)
+        self.assertIn(b"Vegan Dinner", response.data)
