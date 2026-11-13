@@ -355,7 +355,6 @@ def confirm_pickup():
 
 def vendor_dashboard():
 
-
     # Retrieve the selected date range from the URL
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
@@ -393,13 +392,9 @@ def vendor_dashboard():
         query = query.where(db.func.date(Listing.created_at) <= end_date)
 
     # Retrieve the filtered listings
-    listings = (
-        db.session.execute(query.order_by(Listing.created_at.desc()))
-        .scalars()
-        .all()
-    )
-    
-    #count the total number of listings posted
+    listings = db.session.execute(query.order_by(Listing.created_at.desc())).scalars().all()
+
+    # count the total number of listings posted
     total_listings_posted = len(listings)
 
     # Calculate total portions posted
@@ -454,5 +449,5 @@ def vendor_dashboard():
         total_no_show_portions=total_no_show_portions,
         total_no_show_reservations=total_no_show_reservations,
         no_show_rate=no_show_rate,
-        total_listings_posted=total_listings_posted
+        total_listings_posted=total_listings_posted,
     )

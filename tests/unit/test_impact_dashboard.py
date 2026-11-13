@@ -182,8 +182,8 @@ class ImpactDashboardTestCase(unittest.TestCase):
             db.session.add(other_no_show)
 
             # Update remaining portions for the other vendor's no-show
-            other_listing.remaining_portions -= 1   
-       
+            other_listing.remaining_portions -= 1
+
             db.session.commit()
 
         # Request the impact dashboard page
@@ -249,8 +249,14 @@ class ImpactDashboardTestCase(unittest.TestCase):
 
         # Verify an invalid date range redirects to the dashboard
         invalid_response = self.client.get(
-            "/vendor/dashboard?start_date=2026-12-31&end_date=2026-01-01"
+            "/vendor/dashboard?start_date=2026-12-31&end_date=2026-01-01",
+            follow_redirects=True,
         )
 
-        self.assertEqual(invalid_response.status_code, 302)
-        
+        self.assertEqual(invalid_response.status_code, 200)
+
+        # Verify the vendor sees the invalid date range error
+        self.assertIn(
+            b"Start date cannot be after end date.",
+            invalid_response.data,
+        )
