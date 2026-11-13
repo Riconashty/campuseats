@@ -3,6 +3,8 @@ import unittest
 from campuseats import create_app
 from campuseats.config import TestingConfig
 from campuseats.extensions import db
+from datetime import datetime, timedelta
+from campuseats.models.listing import Listing
 
 class ImpactDashboardTestCase(unittest.TestCase):
     def setUp(self):
@@ -24,7 +26,7 @@ class ImpactDashboardTestCase(unittest.TestCase):
                 "email": "vendor@t.edu",
                 "password": "Password123!",
                 "role": "vendor",
-            },
+            }
         )
 
         #Login test vendor
@@ -40,3 +42,9 @@ class ImpactDashboardTestCase(unittest.TestCase):
         #verify page loads successfully
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Impact Dashboard", response.data)
+
+        #verify a vendor with no listings sees 0
+        self.assertIn(
+            b'<p class="fs-3 fw-bold">0</p>',
+            response.data,
+        )        
