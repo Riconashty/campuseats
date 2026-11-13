@@ -243,21 +243,24 @@ def vendor_dashboard():
         .all()
     )
 
-    # Calculate total portions rescued and no-shows
-    total_portions_rescued = sum(
-        res.listing.total_portions - res.listing.remaining_portions
+    # Calculate total portions posted
+    total_portions_posted = sum(listing.total_portions for listing in listings)
+
+    # Calculate total portions picked up
+    total_portions_picked_up = sum(
+        sum(reservation.portions for reservation in listing.reservations if reservation.status == "picked up")
         for listing in listings
-        for res in listing.reservations
-        if res.status == "picked up"
     )
-    total_no_shows = sum(
-        1 for listing in listings for res in listing.reservations if res.status == "no-show"
+
+    # Calculate total of no-show portions
+    total_no_show_portions = sum(
+        sum(reservation.portions for reservation in listing.reservations if reservation.status == "no-show")
+        for listing in listings
     )
 
     return render_template(
         "vendor/dashboard.html",
         listings=listings,
-        total_portions_rescued=total_portions_rescued,
-        total_no_shows=total_no_shows,
+        total_portions_posted=total_portions_posted,
+        total_portions_picked_up=total_portions_picked_up,
     )
-
