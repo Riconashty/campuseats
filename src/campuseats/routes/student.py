@@ -187,6 +187,7 @@ def cancel_reservation(reservation_id):
         return redirect(url_for("student.my_reservations"))
 
     reservation.status = "cancelled"
+    reservation.cancellation_reason = "Cancelled by student"
     listing.remaining_portions += reservation.portions_reserved
     db.session.commit()
 

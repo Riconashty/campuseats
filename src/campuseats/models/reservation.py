@@ -54,6 +54,7 @@ class Reservation(db.Model):
         default="active",
         server_default="active",
     )
+    cancellation_reason = db.Column(db.String(100), nullable=True)
     created_at = db.Column(
         db.DateTime(timezone=True),
         nullable=False,

@@ -258,6 +258,11 @@ class ManageListingsTestCase(unittest.TestCase):
         self.assertEqual(state["status"], "cancelled")
         self.assertEqual(state["reservations"], [("AAAAAA", "cancelled"), ("BBBBBB", "picked up")])
         self.assertEqual(state["remaining"], 9)
+        with self.app.app_context():
+            res_alice = db.session.execute(
+                db.select(Reservation).filter_by(pickup_code="AAAAAA")
+            ).scalar_one()
+            self.assertEqual(res_alice.cancellation_reason, "Cancelled by vendor")
 
     def test_cancelled_listing_disappears_from_student_feed(self):
         lid = self.make_listing(title="Soon Gone")

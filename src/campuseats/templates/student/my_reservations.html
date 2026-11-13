@@ -33,9 +33,19 @@
             {{ r.listing.pickup_end.strftime('%b %d, %I:%M %p') }}
         </td>
         <td>{{ r.portions_reserved }}</td>
-        <td><code class="fs-6">{{ r.pickup_code }}</code></td>
         <td>
+          {% if r.status == 'cancelled' %}
+          <del class="text-muted"><code class="fs-6 text-muted">{{ r.pickup_code }}</code></del>
+          {% else %}
+          <code class="fs-6">{{ r.pickup_code }}</code>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.status == 'cancelled' and r.cancellation_reason == 'Cancelled by vendor' %}
+          <span class="badge bg-danger">Cancelled by Vendor</span>
+          {% else %}
           <span class="badge bg-{{ badge_colors.get(r.status, 'secondary') }}">{{ r.status }}</span>
+          {% endif %}
         </td>
         <td class="text-end">
           {% if r.status == 'active' and r.listing.pickup_end > now %}

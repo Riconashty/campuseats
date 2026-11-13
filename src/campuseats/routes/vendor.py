@@ -229,6 +229,7 @@ def cancel_listing(listing_id):
     for reservation in listing.reservations:
         if reservation.status == "active":
             reservation.status = "cancelled"
+            reservation.cancellation_reason = "Cancelled by vendor"
             listing.remaining_portions += reservation.portions_reserved
 
     db.session.commit()
