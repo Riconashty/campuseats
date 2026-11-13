@@ -225,3 +225,39 @@ def confirm_pickup():
         )
 
     return render_template("vendor/confirm_pickup.html")
+
+
+@vendor_bp.route("/vendor/reservations", methods=["GET"])
+@vendor_required
+# As a vendor, I want an impact dashboard showing portions rescued and no-shows so that I can report results to the sustainability office.
+
+def vendor_dashboard():
+    # Retrieve all listings posted by the current vendor
+    listings = (
+        db.session.execute(
+            db.select(Listing)
+            .filter_by(vendor_id=current_user.id)
+            .order_by(Listing.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+    # Calculate total portions rescued and no-shows
+    total_portions_rescued = sum(
+        res.listing.total_portions - res.listing.remaining_portions
+        for listing in listings
+        for res in listing.reservations
+        if res.status == "picked up"
+    )
+    total_no_shows = sum(
+        1 for listing in listings for res in listing.reservations if res.status == "no-show"
+    )
+
+    return render_template(
+        "vendor/dashboard.html",
+        listings=listings,
+        total_portions_rescued=total_portions_rescued,
+        total_no_shows=total_no_shows,
+    )
+
