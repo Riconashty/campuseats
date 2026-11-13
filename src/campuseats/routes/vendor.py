@@ -354,6 +354,11 @@ def confirm_pickup():
 # As a vendor, I want an impact dashboard showing portions rescued and no-shows so that I can report results to the sustainability office.
 
 def vendor_dashboard():
+
+    # Retrieve the selected date range from the URL
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+
     # Retrieve all listings posted by the current vendor
     listings = (
         db.session.execute(

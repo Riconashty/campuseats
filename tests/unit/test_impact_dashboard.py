@@ -164,6 +164,23 @@ class ImpactDashboardTestCase(unittest.TestCase):
                 status="picked up",
             )
             db.session.add(other_pickup)
+
+            # Update the other vendor's remaining portions
+            other_listing.remaining_portions -= 2
+
+            # Create a no-show reservation for the other vendor
+            other_no_show = Reservation(
+                student_id=student.id,
+                listing=other_listing,
+                portions_reserved=1,
+                pickup_code="US9B02",
+                status="no-show",
+            )
+            db.session.add(other_no_show)
+
+            # Update remaining portions for the other vendor's no-show
+            other_listing.remaining_portions -= 1   
+       
             db.session.commit()
 
         # Request the impact dashboard page
