@@ -219,3 +219,14 @@ class ImpactDashboardTestCase(unittest.TestCase):
             b'<p class="fs-3 fw-bold">33.3%</p>',
             response.data,
         )
+
+        # Verify that a future date range excludes existing listings
+        filtered_response = self.client.get(
+            "/vendor/dashboard?start_date=2099-01-01&end_date=2099-12-31"
+        )
+
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertIn(
+            b'<p class="fs-3 fw-bold">0</p>',
+            filtered_response.data,
+        )
