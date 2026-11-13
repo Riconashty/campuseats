@@ -113,6 +113,9 @@ class ImpactDashboardTestCase(unittest.TestCase):
                     pickup_end=datetime.now() + timedelta(hours=2),
                     status="active",
                 )
+                # Give the first listing an older creation date
+                if i == 0:
+                    listing.created_at = datetime(2020, 1, 1)
                 db.session.add(listing)
 
             #  Create ONE reservation for the last listing
@@ -230,3 +233,24 @@ class ImpactDashboardTestCase(unittest.TestCase):
             b'<p class="fs-3 fw-bold">0</p>',
             filtered_response.data,
         )
+
+        # Verify date filtering excludes the older listing
+        filtered_response = self.client.get(
+            "/vendor/dashboard?start_date=2021-01-01&end_date=2098-12-31"
+        )
+
+        self.assertEqual(filtered_response.status_code, 200)
+
+        # Verify exactly two listings are included
+        self.assertIn(
+            b'<h5>Total Listings Posted</h5>\n    <p class="fs-3 fw-bold">2</p>',
+            filtered_response.data,
+        )
+
+        # Verify an invalid date range redirects to the dashboard
+        invalid_response = self.client.get(
+            "/vendor/dashboard?start_date=2026-12-31&end_date=2026-01-01"
+        )
+
+        self.assertEqual(invalid_response.status_code, 302)
+        

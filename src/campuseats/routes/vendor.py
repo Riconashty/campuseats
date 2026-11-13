@@ -355,6 +355,7 @@ def confirm_pickup():
 
 def vendor_dashboard():
 
+
     # Retrieve the selected date range from the URL
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
@@ -367,37 +368,37 @@ def vendor_dashboard():
             flash("Please enter a valid start date.", "danger")
             return redirect(url_for("vendor.vendor_dashboard"))
 
-        # Convert the end date string into a Python date
-        if end_date:
-            try:
-                end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
-            except ValueError:
-                flash("Please enter a valid end date.", "danger")
-                return redirect(url_for("vendor.vendor_dashboard"))    
+    # Convert the end date string into a Python date
+    if end_date:
+        try:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Please enter a valid end date.", "danger")
+            return redirect(url_for("vendor.vendor_dashboard"))
 
-            # Ensure the start date is not after the end date
-            if start_date and end_date and start_date > end_date:
-                flash("Start date cannot be after end date.", "danger")
-                return redirect(url_for("vendor.vendor_dashboard"))    
+    # Ensure the start date is not after the end date
+    if start_date and end_date and start_date > end_date:
+        flash("Start date cannot be after end date.", "danger")
+        return redirect(url_for("vendor.vendor_dashboard"))
 
-            # Start with listings belonging to the current vendor
-            query = db.select(Listing).filter_by(vendor_id=current_user.id)
+    # Start with listings belonging to the current vendor
+    query = db.select(Listing).filter_by(vendor_id=current_user.id)
 
-            # Filter listings by the selected start date
-            if start_date:
-                query = query.where(db.func.date(Listing.created_at) >= start_date)
+    # Filter listings by the selected start date
+    if start_date:
+        query = query.where(db.func.date(Listing.created_at) >= start_date)
 
-                # Filter listings by the selected end date
-            if end_date:
-                query = query.where(db.func.date(Listing.created_at) <= end_date)
+    # Filter listings by the selected end date
+    if end_date:
+        query = query.where(db.func.date(Listing.created_at) <= end_date)
 
-            # Retrieve the filtered listings
-            listings = (
-                db.session.execute(query.order_by(Listing.created_at.desc()))
-                .scalars()
-                .all()
-)
-
+    # Retrieve the filtered listings
+    listings = (
+        db.session.execute(query.order_by(Listing.created_at.desc()))
+        .scalars()
+        .all()
+    )
+    
     #count the total number of listings posted
     total_listings_posted = len(listings)
 
