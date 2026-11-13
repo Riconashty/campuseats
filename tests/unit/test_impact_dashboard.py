@@ -1,4 +1,6 @@
 import unittest
+from urllib import response
+from urllib import response
 
 from campuseats import create_app
 from campuseats.config import TestingConfig
@@ -76,6 +78,16 @@ class ImpactDashboardTestCase(unittest.TestCase):
                 db.select(User.id).filter_by(email="vendor@t.edu")
             ).scalar_one()
 
+            # Create a student for testing reservations
+            student = User(
+                name="Test Student",
+                email="student@t.edu",
+                password_hash="test",
+                role="student",
+            )
+            db.session.add(student)
+            db.session.flush()
+
             # Create multiple listings for the vendor
             for i in range(3):
                 listing = Listing(
@@ -91,6 +103,31 @@ class ImpactDashboardTestCase(unittest.TestCase):
                 )
                 db.session.add(listing)
 
+            #  Create ONE reservation for the last listing
+            pickup_reservation = Reservation(
+                student_id=student.id,
+                listing=listing,
+                portions_reserved=2,
+                pickup_code="US9A01",
+                status="picked up",
+            )
+            db.session.add(pickup_reservation)
+
+            #update remaning portions
+            listing.remaining_portions -= 2
+
+            # Create a no-show reservation
+            no_show_reservation = Reservation(
+                student_id=student.id,
+                listing=listing,
+                portions_reserved=1,
+                pickup_code="US9A02",
+                status="no-show",
+            )
+            db.session.add(no_show_reservation)
+
+            # Update remaining portions for the no-show reservation
+            listing.remaining_portions -= 1
             db.session.commit()
 
         # Request the impact dashboard page
@@ -109,5 +146,17 @@ class ImpactDashboardTestCase(unittest.TestCase):
         #verify total number of portions posted
         self.assertIn(
             b'<p class="fs-3 fw-bold">15</p>',
+            response.data,
+        )
+
+        # Verify the total portions successfully picked up
+        self.assertIn(
+            b'<p class="fs-3 fw-bold">2</p>',
+            response.data,
+        )
+
+        # Verify the number of no-show reservations
+        self.assertIn(
+            b'<p class="fs-3 fw-bold">1</p>',
             response.data,
         )
