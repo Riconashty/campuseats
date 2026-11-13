@@ -1,6 +1,4 @@
 import unittest
-from urllib import response
-from urllib import response
 
 from campuseats import create_app
 from campuseats.config import TestingConfig
@@ -9,6 +7,7 @@ from datetime import datetime, timedelta
 from campuseats.models.listing import Listing
 from campuseats.models.user import User
 from campuseats.models.reservation import Reservation
+
 
 class ImpactDashboardTestCase(unittest.TestCase):
     def setUp(self):
@@ -22,7 +21,7 @@ class ImpactDashboardTestCase(unittest.TestCase):
             db.engine.dispose()
 
     def test_vendor_can_access(self):
-        #Register test vendor
+        # Register test vendor
         self.client.post(
             "/register",
             data={
@@ -30,31 +29,35 @@ class ImpactDashboardTestCase(unittest.TestCase):
                 "email": "vendor@t.edu",
                 "password": "Password123!",
                 "role": "vendor",
-            }
+            },
         )
 
-        #Login test vendor
+        # Login test vendor
         self.client.post(
             "/login",
-            data={"email": "vendor@t.edu", 
-                  "password": "Password123!"},
+            data={"email": "vendor@t.edu", "password": "Password123!"},
         )
 
         # Request the impact dashboard page
         response = self.client.get("/vendor/dashboard")
 
-        #verify page loads successfully
+        # verify page loads successfully
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Impact Dashboard", response.data)
 
-        #verify a vendor with no listings sees 0
+        # verify a vendor with no listings sees 0
         self.assertIn(
             b'<p class="fs-3 fw-bold">0</p>',
             response.data,
-        )    
+        )
+        # Verify the no-show rate is 0% when there are no reservations
+        self.assertIn(
+            b'<p class="fs-3 fw-bold">0%</p>',
+            response.data,
+        )
 
     def test_dashboard_counts_multiple_listings(self):
-        #Register test vendor
+        # Register test vendor
         self.client.post(
             "/register",
             data={
@@ -62,21 +65,30 @@ class ImpactDashboardTestCase(unittest.TestCase):
                 "email": "vendor@t.edu",
                 "password": "Password123!",
                 "role": "vendor",
-            }
+            },
         )
 
-        #Login test vendor
+        # Login test vendor
         self.client.post(
             "/login",
-            data={"email": "vendor@t.edu", 
-                  "password": "Password123!"},
+            data={"email": "vendor@t.edu", "password": "Password123!"},
         )
 
-        #retrieve vendor ID
+        # retrieve vendor ID
         with self.app.app_context():
             vendor_id = db.session.execute(
                 db.select(User.id).filter_by(email="vendor@t.edu")
             ).scalar_one()
+
+            # Create a second vendor to test data isolation
+            other_vendor = User(
+                name="Other Vendor",
+                email="other@t.edu",
+                password_hash="test",
+                role="vendor",
+            )
+            db.session.add(other_vendor)
+            db.session.flush()
 
             # Create a student for testing reservations
             student = User(
@@ -92,7 +104,7 @@ class ImpactDashboardTestCase(unittest.TestCase):
             for i in range(3):
                 listing = Listing(
                     vendor_id=vendor_id,
-                    title=f"Test Listing {i+1}",
+                    title=f"Test Listing {i + 1}",
                     description="Test Description",
                     total_portions=5,
                     remaining_portions=5,
@@ -113,7 +125,7 @@ class ImpactDashboardTestCase(unittest.TestCase):
             )
             db.session.add(pickup_reservation)
 
-            #update remaning portions
+            # update remaning portions
             listing.remaining_portions -= 2
 
             # Create a no-show reservation
@@ -128,6 +140,30 @@ class ImpactDashboardTestCase(unittest.TestCase):
 
             # Update remaining portions for the no-show reservation
             listing.remaining_portions -= 1
+
+            # Create a listing belonging to the other vendor
+            other_listing = Listing(
+                vendor_id=other_vendor.id,
+                title="Other Vendor Listing",
+                description="Food from another vendor",
+                total_portions=20,
+                remaining_portions=20,
+                pickup_location="Campus Cafe",
+                pickup_start=datetime.now(),
+                pickup_end=datetime.now() + timedelta(hours=2),
+                status="active",
+            )
+            db.session.add(other_listing)
+
+            # Create a pickup reservation for the other vendor
+            other_pickup = Reservation(
+                student_id=student.id,
+                listing=other_listing,
+                portions_reserved=2,
+                pickup_code="US9B01",
+                status="picked up",
+            )
+            db.session.add(other_pickup)
             db.session.commit()
 
         # Request the impact dashboard page
@@ -143,7 +179,7 @@ class ImpactDashboardTestCase(unittest.TestCase):
             response.data,
         )
 
-        #verify total number of portions posted
+        # verify total number of portions posted
         self.assertIn(
             b'<p class="fs-3 fw-bold">15</p>',
             response.data,
@@ -158,5 +194,11 @@ class ImpactDashboardTestCase(unittest.TestCase):
         # Verify the number of no-show reservations
         self.assertIn(
             b'<p class="fs-3 fw-bold">1</p>',
+            response.data,
+        )
+
+        # Verify the no-show rate is calculated correctly
+        self.assertIn(
+            b'<p class="fs-3 fw-bold">33.3%</p>',
             response.data,
         )
