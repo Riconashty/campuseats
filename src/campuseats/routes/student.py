@@ -163,22 +163,23 @@ def my_reservations():
 @student_bp.route("/student/reservations/<int:reservation_id>/cancel", methods=["POST"])
 @student_required
 def cancel_reservation(reservation_id):
-    # Lock the reservation first so two simultaneous cancels cannot both succeed
-    reservation = db.session.execute(
-        db.select(Reservation).filter_by(id=reservation_id).with_for_update()
-    ).scalar_one_or_none()
+    # Read the reservation without a lock to learn who owns it and which listing it is on
+    reservation = db.session.get(Reservation, reservation_id)
 
     if reservation is None:
-        db.session.rollback()
         abort(404)
     if reservation.student_id != current_user.id:
-        db.session.rollback()
         abort(403)
 
-    # Then lock the listing, the same way reserve_listing does
+    # Lock order is always listing first, the same as reserve_listing() and cancel_listing().
+    # The reservation row is locked later, by the UPDATE that commit() sends.
     listing = db.session.execute(
         db.select(Listing).filter_by(id=reservation.listing_id).with_for_update()
     ).scalar_one()
+
+    # Re-read the reservation now that the listing is locked: another request may have
+    # cancelled it while this one was waiting for the lock
+    db.session.refresh(reservation)
 
     if reservation.status != "active" or listing.pickup_end <= datetime.now():
         db.session.rollback()
