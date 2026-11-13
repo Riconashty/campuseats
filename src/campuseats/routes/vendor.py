@@ -370,13 +370,21 @@ def vendor_dashboard():
 
     # Calculate total portions picked up
     total_portions_picked_up = sum(
-        sum(reservation.portions for reservation in listing.reservations if reservation.status == "picked up")
+        sum(
+            reservation.portions
+            for reservation in listing.reservations
+            if reservation.status == "picked up"
+        )
         for listing in listings
     )
 
     # Calculate total of no-show portions
     total_no_show_portions = sum(
-        sum(reservation.portions for reservation in listing.reservations if reservation.status == "no-show")
+        sum(
+            reservation.portions
+            for reservation in listing.reservations
+            if reservation.status == "no-show"
+        )
         for listing in listings
     )
 
@@ -385,4 +393,5 @@ def vendor_dashboard():
         listings=listings,
         total_portions_posted=total_portions_posted,
         total_portions_picked_up=total_portions_picked_up,
+        total_no_show_portions=total_no_show_portions
     )
