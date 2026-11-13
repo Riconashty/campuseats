@@ -349,7 +349,7 @@ def confirm_pickup():
     return render_template("vendor/confirm_pickup.html")
 
 
-@vendor_bp.route("/vendor/reservations", methods=["GET"])
+@vendor_bp.route("/vendor/dashboard", methods=["GET"])
 @vendor_required
 # As a vendor, I want an impact dashboard showing portions rescued and no-shows so that I can report results to the sustainability office.
 
@@ -365,13 +365,16 @@ def vendor_dashboard():
         .all()
     )
 
+    #count the total number of listings posted
+    total_listings_posted = len(listings)
+
     # Calculate total portions posted
     total_portions_posted = sum(listing.total_portions for listing in listings)
 
     # Calculate total portions picked up
     total_portions_picked_up = sum(
         sum(
-            reservation.portions
+            reservation.portions_reserved
             for reservation in listing.reservations
             if reservation.status == "picked up"
         )
@@ -381,17 +384,41 @@ def vendor_dashboard():
     # Calculate total of no-show portions
     total_no_show_portions = sum(
         sum(
-            reservation.portions
+            reservation.portions_reserved
             for reservation in listing.reservations
             if reservation.status == "no-show"
         )
         for listing in listings
     )
 
+    # Calculate total portions reserved by students
+    total_portions_reserved = sum(
+        reservation.portions_reserved
+        for listing in listings
+        for reservation in listing.reservations
+    )
+
+    # count the number of no-show reservations
+    total_no_show_reservations = sum(
+        1
+        for listing in listings
+        for reservation in listing.reservations
+        if reservation.status == "no-show"
+    )
+
+    # calculate the no-show rate as percentage
+    if total_portions_reserved > 0:
+        no_show_rate = (total_no_show_reservations / total_portions_reserved) * 100
+    else:
+        no_show_rate = 0
+
     return render_template(
         "vendor/dashboard.html",
         listings=listings,
         total_portions_posted=total_portions_posted,
         total_portions_picked_up=total_portions_picked_up,
-        total_no_show_portions=total_no_show_portions
+        total_no_show_portions=total_no_show_portions,
+        total_no_show_reservations=total_no_show_reservations,
+        no_show_rate=no_show_rate,
+        total_listings_posted=total_listings_posted
     )
