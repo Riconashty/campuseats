@@ -347,3 +347,91 @@ def confirm_pickup():
         )
 
     return render_template("vendor/confirm_pickup.html")
+
+
+@vendor_bp.route("/vendor/dashboard", methods=["GET"])
+@vendor_required
+# As a vendor, I want an impact dashboard showing portions rescued and no-shows so that I can report results to the sustainability office.
+
+def vendor_dashboard():
+    # Retrieve the selected date range from the URL
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+
+    # Convert the start date string into a Python date
+    if start_date:
+        try:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Please enter a valid start date.", "danger")
+            return redirect(url_for("vendor.vendor_dashboard"))
+
+    # Convert the end date string into a Python date
+    if end_date:
+        try:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Please enter a valid end date.", "danger")
+            return redirect(url_for("vendor.vendor_dashboard"))
+
+    # Ensure the start date is not after the end date
+    if start_date and end_date and start_date > end_date:
+        flash("Start date cannot be after end date.", "danger")
+        return redirect(url_for("vendor.vendor_dashboard"))
+
+    # Start with listings belonging to the current vendor
+    query = db.select(Listing).filter_by(vendor_id=current_user.id)
+
+    # Filter listings by the selected start date
+    if start_date:
+        query = query.where(db.func.date(Listing.created_at) >= start_date)
+
+    # Filter listings by the selected end date
+    if end_date:
+        query = query.where(db.func.date(Listing.created_at) <= end_date)
+
+    # Calculate listing counts and portions using SQLAlchemy
+    total_listings_posted, total_portions_posted = db.session.execute(
+        query.with_only_columns(
+            db.func.count(Listing.id),
+            db.func.coalesce(db.func.sum(Listing.total_portions), 0),
+        )
+    ).one()
+
+    # Calculate reservation totals using SQLAlchemy
+    reservation_totals = db.session.execute(
+        db.select(
+            Reservation.status,
+            db.func.count(Reservation.id),
+            db.func.coalesce(db.func.sum(Reservation.portions_reserved), 0),
+        )
+        .where(Reservation.listing_id.in_(query.with_only_columns(Listing.id)))
+        .group_by(Reservation.status)
+    ).all()
+
+    # Organize reservation counts and portions by status
+    reservation_counts = {status: count for status, count, portions in reservation_totals}
+    reservation_portions = {status: portions for status, count, portions in reservation_totals}
+
+    total_portions_picked_up = reservation_portions.get("picked up", 0)
+    total_no_show_portions = reservation_portions.get("no-show", 0)
+    total_no_show_reservations = reservation_counts.get("no-show", 0)
+    total_portions_reserved = sum(
+        portions for status, portions in reservation_portions.items() if status != "cancelled"
+    )
+
+    # calculate the no-show rate as percentage
+    if total_portions_reserved > 0:
+        no_show_rate = (total_no_show_portions / total_portions_reserved) * 100
+    else:
+        no_show_rate = 0
+
+    return render_template(
+        "vendor/dashboard.html",
+        total_portions_posted=total_portions_posted,
+        total_portions_picked_up=total_portions_picked_up,
+        total_no_show_portions=total_no_show_portions,
+        total_no_show_reservations=total_no_show_reservations,
+        no_show_rate=no_show_rate,
+        total_listings_posted=total_listings_posted,
+    )
