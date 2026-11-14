@@ -135,14 +135,14 @@ class ImpactDashboardTestCase(unittest.TestCase):
             no_show_reservation = Reservation(
                 student_id=student.id,
                 listing=listing,
-                portions_reserved=1,
+                portions_reserved=2,
                 pickup_code="US9A02",
                 status="no-show",
             )
             db.session.add(no_show_reservation)
 
             # Update remaining portions for the no-show reservation
-            listing.remaining_portions -= 1
+            listing.remaining_portions -= 2
 
             # Create a listing belonging to the other vendor
             other_listing = Listing(
@@ -217,9 +217,9 @@ class ImpactDashboardTestCase(unittest.TestCase):
             response.data,
         )
 
-        # Verify the no-show rate is calculated correctly
+        # Verify the no-show rate uses portions, not reservation count
         self.assertIn(
-            b'<p class="fs-3 fw-bold">33.3%</p>',
+            b'<p class="fs-3 fw-bold">50.0%</p>',
             response.data,
         )
 
@@ -241,9 +241,9 @@ class ImpactDashboardTestCase(unittest.TestCase):
 
         self.assertEqual(filtered_response.status_code, 200)
 
-        # Verify exactly two listings are included
+        # Verify the filtered dashboard displays exactly 2 listings
         self.assertIn(
-            b'<h5>Total Listings Posted</h5>\n    <p class="fs-3 fw-bold">2</p>',
+            b'<h5>Total Listings Posted</h5>\n            <p class="fs-3 fw-bold">2</p>',
             filtered_response.data,
         )
 

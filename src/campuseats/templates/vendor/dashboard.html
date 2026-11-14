@@ -9,11 +9,13 @@
     <div class="row g-3">
         <div class="col-md-4">
             <label for="start_date" class="form-label">Start Date</label>
-            <input type="date" class="form-control" id="start_date" name="start_date">
+            <input type="date" class="form-control" id="start_date"
+                name="start_date" value="{{ request.args.get('start_date', '') }}">
         </div>
         <div class="col-md-4">
             <label for="end_date" class="form-label">End Date</label>
-            <input type="date" class="form-control" id="end_date" name="end_date">
+            <input type="date" class="form-control" id="end_date"
+                name="end_date" value="{{ request.args.get('end_date', '') }}">
         </div>
         <div class="col-md-4 d-flex align-items-end">
             <button type="submit" class="btn btn-primary">Apply Filter</button>
@@ -21,24 +23,41 @@
     </div>
 </form>
 
-<div class="card p-3 mb-3">
-    <h5>Total Listings Posted</h5>
-    <p class="fs-3 fw-bold">{{ total_listings_posted }}</p>
-</div>
-<div class="card p-3 mb-3">
-    <h5>Total Portions Posted</h5>
-    <p class="fs-3 fw-bold">{{ total_portions_posted }}</p>
-</div>
-<div class="card p-3 mb-3">
-    <h5>Portions Picked Up</h5>
-    <p class="fs-3 fw-bold">{{ total_portions_picked_up }}</p>
-</div>
-<div class="card p-3 mb-3">
-    <h5>No-Show Reservations</h5>
-    <p class="fs-3 fw-bold">{{ total_no_show_reservations }}</p>
-</div>
-<div class="card p-3 mb-3">
-    <h5>No-Show Rate</h5>
-    <p class="fs-3 fw-bold">{{ no_show_rate | round(1) if no_show_rate else 0 }}%</p>
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+    <div class="col">
+        <div class="card p-3 h-100">
+            <h5>Total Listings Posted</h5>
+            <p class="fs-3 fw-bold">{{ total_listings_posted }}</p>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card p-3 h-100">
+            <h5>Total Portions Posted</h5>
+            <p class="fs-3 fw-bold">{{ total_portions_posted }}</p>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card p-3 h-100">
+            <h5>Portions Picked Up</h5>
+            <p class="fs-3 fw-bold">{{ total_portions_picked_up }}</p>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card p-3 h-100">
+            <h5>No-Show Reservations</h5>
+            <p class="fs-3 fw-bold">{{ total_no_show_reservations }}</p>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card p-3 h-100">
+            <h5>No-Show Rate</h5>
+            <p class="fs-3 fw-bold">{{ no_show_rate | round(1) if no_show_rate else 0 }}%</p>
+        </div>
+    </div>
 </div>
 {% endblock %}

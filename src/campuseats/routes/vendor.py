@@ -390,9 +390,6 @@ def vendor_dashboard():
     if end_date:
         query = query.where(db.func.date(Listing.created_at) <= end_date)
 
-    # Retrieve the filtered listings
-    listings = db.session.execute(query.order_by(Listing.created_at.desc())).scalars().all()
-
     # Calculate listing counts and portions using SQLAlchemy
     total_listings_posted, total_portions_posted = db.session.execute(
         query.with_only_columns(
@@ -400,9 +397,6 @@ def vendor_dashboard():
             db.func.coalesce(db.func.sum(Listing.total_portions), 0),
         )
     ).one()
-
-    # Calculate total portions posted
-    total_portions_posted = sum(listing.total_portions for listing in listings)
 
     # Calculate reservation totals using SQLAlchemy
     reservation_totals = db.session.execute(
@@ -423,9 +417,7 @@ def vendor_dashboard():
     total_no_show_portions = reservation_portions.get("no-show", 0)
     total_no_show_reservations = reservation_counts.get("no-show", 0)
     total_portions_reserved = sum(
-        portions
-        for status, portions in reservation_portions.items()
-        if status != "cancelled"
+        portions for status, portions in reservation_portions.items() if status != "cancelled"
     )
 
     # calculate the no-show rate as percentage
@@ -436,7 +428,6 @@ def vendor_dashboard():
 
     return render_template(
         "vendor/dashboard.html",
-        listings=listings,
         total_portions_posted=total_portions_posted,
         total_portions_picked_up=total_portions_picked_up,
         total_no_show_portions=total_no_show_portions,
