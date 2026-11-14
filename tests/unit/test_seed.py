@@ -12,6 +12,7 @@ from werkzeug.security import check_password_hash
 from campuseats import create_app
 from campuseats.config import TestingConfig
 from campuseats.extensions import db
+from campuseats.models.listing import Listing
 from campuseats.models.user import User
 from campuseats.seed import seed_database
 
@@ -49,17 +50,29 @@ class SeedDatabaseTestCase(unittest.TestCase):
             self.assertEqual(student.name, "Alex Student")
             self.assertTrue(check_password_hash(student.password_hash, "Student123!"))
 
+            # Verify realistic surplus listings were created
+            listings = db.session.execute(db.select(Listing)).scalars().all()
+            self.assertEqual(len(listings), 4)
+            for item in listings:
+                self.assertEqual(item.vendor_id, vendor.id)
+                self.assertEqual(item.status, "active")
+                self.assertGreater(len(item.tags), 0)
+
     def test_seed_database_idempotent_when_users_already_exist(self):
         with self.app.app_context():
             seed_database()
             initial_count = len(db.session.execute(db.select(User)).scalars().all())
+            initial_listings_count = len(db.session.execute(db.select(Listing)).scalars().all())
 
-            # Second call should safely no-op without adding duplicate users
+            # Second call should safely no-op without adding duplicate users or listings
             seed_database()
             subsequent_count = len(db.session.execute(db.select(User)).scalars().all())
+            subsequent_listings_count = len(db.session.execute(db.select(Listing)).scalars().all())
 
             self.assertEqual(initial_count, subsequent_count)
             self.assertEqual(subsequent_count, 2)
+            self.assertEqual(initial_listings_count, subsequent_listings_count)
+            self.assertEqual(subsequent_listings_count, 4)
 
     def test_create_app_seeds_when_configured(self):
         class SeedConfig(TestingConfig):
