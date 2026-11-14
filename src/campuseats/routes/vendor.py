@@ -103,10 +103,14 @@ def _get_owned_listing(listing_id, lock=False):
 @vendor_bp.route("/vendor/listings", methods=["GET"])
 @vendor_required
 def vendor_listings():
-    # Retrieve all listings posted by the current vendor
+    # Retrieve all listings posted by the current vendor with reservations and ratings
     listings = (
         db.session.execute(
             db.select(Listing)
+            .options(
+                selectinload(Listing.tags),
+                selectinload(Listing.reservations).selectinload(Reservation.rating),
+            )
             .filter_by(vendor_id=current_user.id)
             .order_by(Listing.created_at.desc())
         )

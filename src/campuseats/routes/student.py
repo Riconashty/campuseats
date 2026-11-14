@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from campuseats.extensions import db
 from campuseats.models.listing import Listing
+from campuseats.models.rating import Rating
 from campuseats.models.reservation import Reservation, generate_unique_pickup_code
 from campuseats.routes.role_guards import student_required
 
@@ -143,7 +144,10 @@ def my_reservations():
     reservations = (
         db.session.execute(
             db.select(Reservation)
-            .options(selectinload(Reservation.listing).selectinload(Listing.vendor))
+            .options(
+                selectinload(Reservation.listing).selectinload(Listing.vendor),
+                selectinload(Reservation.rating),
+            )
             .filter_by(student_id=current_user.id)
             .order_by(
                 case((Reservation.status == "active", 0), else_=1),
@@ -157,6 +161,91 @@ def my_reservations():
         "student/my_reservations.html",
         reservations=reservations,
         now=datetime.now(),
+    )
+
+
+@student_bp.route("/student/reservations/<int:reservation_id>/rate", methods=["GET", "POST"])
+@student_required
+def rate_reservation(reservation_id):
+    # Query reservation with associated listing, vendor, and existing rating
+    reservation = db.session.execute(
+        db.select(Reservation)
+        .options(
+            selectinload(Reservation.listing).selectinload(Listing.vendor),
+            selectinload(Reservation.rating),
+        )
+        .filter_by(id=reservation_id)
+    ).scalar_one_or_none()
+
+    # Verify reservation existence
+    if reservation is None:
+        abort(404)
+
+    # Restrict access to owning student
+    if reservation.student_id != current_user.id:
+        abort(403)
+
+    # Enforce eligibility guard so only picked up reservations can be rated
+    if reservation.status != "picked up":
+        flash("Only picked-up reservations can be rated.", "danger")
+        return redirect(url_for("student.my_reservations"))
+
+    # Prevent duplicate ratings for the same reservation
+    if reservation.rating is not None:
+        flash("You have already rated this reservation.", "danger")
+        return redirect(url_for("student.my_reservations"))
+
+    if request.method == "POST":
+        stars_raw = request.form.get("stars", "").strip()
+        comment = request.form.get("comment", "").strip()
+
+        # Validate star rating format and bounds
+        try:
+            stars = int(stars_raw)
+            if stars < 1 or stars > 5:
+                raise ValueError
+        except (ValueError, TypeError):
+            flash("Star rating must be an integer between 1 and 5.", "danger")
+            return render_template(
+                "student/rate.html",
+                reservation=reservation,
+                stars=stars_raw,
+                comment=comment,
+            )
+
+        # Validate comment length limit
+        if len(comment) > 300:
+            flash("Comment must not exceed 300 characters.", "danger")
+            return render_template(
+                "student/rate.html",
+                reservation=reservation,
+                stars=stars,
+                comment=comment,
+            )
+
+        # Persist rating record and handle concurrent duplicate race conditions
+        new_rating = Rating(
+            reservation_id=reservation.id,
+            stars=stars,
+            comment=comment if comment else None,
+        )
+
+        try:
+            db.session.add(new_rating)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash("You have already rated this reservation.", "danger")
+            return redirect(url_for("student.my_reservations"))
+
+        flash("Thank you for your rating!", "success")
+        return redirect(url_for("student.my_reservations"))
+
+    return render_template(
+        "student/rate.html",
+        reservation=reservation,
+        stars=None,
+        comment="",
     )
 
 
