@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from campuseats.extensions import db
-from campuseats.models.listing import Listing
+from campuseats.models.listing import DEFAULT_DIETARY_TAGS, DietaryTag, Listing
 from campuseats.models.reservation import Reservation, generate_unique_pickup_code
 from campuseats.routes.role_guards import student_required
 
@@ -16,18 +16,45 @@ student_bp = Blueprint("student", __name__)
 @student_bp.route("/listings", methods=["GET"])
 @student_required
 def listings():
-    # Retrieve active surplus food listings whose pickup windows have not yet elapsed
     now = datetime.now()
+
+    # Read filters from the URL, e.g. /listings?tags=vegan&tags=halal&location=Student+Union
+    selected_tags = []
+    for raw_tag in request.args.getlist("tags"):
+        tag_name = raw_tag.strip().lower()
+        # Ignore anything that is not a real tag, and ignore repeats
+        if tag_name in DEFAULT_DIETARY_TAGS and tag_name not in selected_tags:
+            selected_tags.append(tag_name)
+    selected_location = request.args.get("location", "").strip()
+
+    # A listing is available when it is active, has portions left, and has not ended
+    available = (
+        Listing.status == "active",
+        Listing.remaining_portions > 0,
+        Listing.pickup_end > now,
+    )
+
+    listings_query = (
+        db.select(Listing)
+        .options(selectinload(Listing.vendor), selectinload(Listing.tags))
+        .filter(*available)
+    )
+    for tag_name in selected_tags:
+        listings_query = listings_query.filter(Listing.tags.any(DietaryTag.name == tag_name))
+    if selected_location:
+        listings_query = listings_query.filter(Listing.pickup_location == selected_location)
+
     available_listings = (
+        db.session.execute(listings_query.order_by(Listing.pickup_end.asc())).scalars().all()
+    )
+    # Dropdown choices: every location that currently has an available listing.
+    # Built from the unfiltered feed so the choices do not shrink once a filter is applied.
+    location_options = (
         db.session.execute(
-            db.select(Listing)
-            .options(selectinload(Listing.vendor), selectinload(Listing.tags))
-            .filter(
-                Listing.status == "active",
-                Listing.remaining_portions > 0,
-                Listing.pickup_end > now,
-            )
-            .order_by(Listing.pickup_end.asc())
+            db.select(Listing.pickup_location)
+            .filter(*available)
+            .distinct()
+            .order_by(Listing.pickup_location)
         )
         .scalars()
         .all()
@@ -64,6 +91,11 @@ def listings():
         listings=available_listings,
         active_reservations_by_listing=active_reservations_by_listing,
         recent_reservation=recent_reservation,
+        available_tags=DEFAULT_DIETARY_TAGS,
+        selected_tags=selected_tags,
+        location_options=location_options,
+        selected_location=selected_location,
+        filters_active=bool(selected_tags or selected_location),
     )
 
 

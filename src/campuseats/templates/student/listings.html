@@ -18,7 +18,38 @@
   </div>
   {% endif %}
 </div>
+<form method="GET" action="{{ url_for('student.listings') }}" id="filter-form" class="card card-body shadow-sm mb-4">
+  <div class="row g-3 align-items-end">
+    <div class="col-12 col-lg-6">
+      <span class="form-label fw-semibold d-block">Dietary tags</span>
+      {% for tag in available_tags %}
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="tags" value="{{ tag }}"
+               id="filter-tag-{{ loop.index }}" {% if tag in selected_tags %}checked{% endif %}>
+        <label class="form-check-label" for="filter-tag-{{ loop.index }}">{{ tag | capitalize }}</label>
+      </div>
+      {% endfor %}
+    </div>
 
+    <div class="col-12 col-md-6 col-lg-3">
+      <label for="filter-location" class="form-label fw-semibold">Campus location</label>
+      <select name="location" id="filter-location" class="form-select">
+        <option value="">All locations</option>
+        {% for location in location_options %}
+        <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>{{ location }}</option>
+        {% endfor %}
+        {% if selected_location and selected_location not in location_options %}
+        <option value="{{ selected_location }}" selected>{{ selected_location }}</option>
+        {% endif %}
+      </select>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-3 d-flex gap-2">
+      <button type="submit" class="btn btn-success flex-grow-1">Apply filters</button>
+      <a href="{{ url_for('student.listings') }}" id="clear-filters" class="btn btn-outline-secondary">Clear filters</a>
+    </div>
+  </div>
+</form>
 {% if listings %}
 <div class="row g-4">
   {% for listing in listings %}
@@ -86,6 +117,16 @@
     </div>
   </div>
   {% endfor %}
+</div>
+{% elif filters_active %}
+<div class="col-12">
+  <div class="alert alert-info text-center p-4">
+    <h4 class="alert-heading fw-bold">No Matching Listings</h4>
+    <p class="mb-0">
+      No listings match your filters.
+      <a href="{{ url_for('student.listings') }}" class="alert-link">Clear filters</a> to see everything available.
+    </p>
+  </div>
 </div>
 {% else %}
 <div class="col-12">
