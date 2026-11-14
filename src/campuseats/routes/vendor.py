@@ -422,11 +422,15 @@ def vendor_dashboard():
     total_portions_picked_up = reservation_portions.get("picked up", 0)
     total_no_show_portions = reservation_portions.get("no-show", 0)
     total_no_show_reservations = reservation_counts.get("no-show", 0)
-    total_portions_reserved = sum(reservation_portions.values())
+    total_portions_reserved = sum(
+        portions
+        for status, portions in reservation_portions.items()
+        if status != "cancelled"
+    )
 
     # calculate the no-show rate as percentage
     if total_portions_reserved > 0:
-        no_show_rate = (total_no_show_reservations / total_portions_reserved) * 100
+        no_show_rate = (total_no_show_portions / total_portions_reserved) * 100
     else:
         no_show_rate = 0
 
