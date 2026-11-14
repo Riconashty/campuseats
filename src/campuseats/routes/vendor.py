@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy.orm import selectinload
 
@@ -9,6 +9,95 @@ from campuseats.models.reservation import Reservation
 from campuseats.routes.role_guards import vendor_required
 
 vendor_bp = Blueprint("vendor", __name__)
+
+
+def _validate_listing_form(form):
+    """
+    Check a submitted listing form against the US2 rules.
+    Returns (data, error). If the form is valid, data is a dict of cleaned values and
+    error is None. If not, data is None and error is the message to flash.
+    """
+    title = form.get("title", "").strip()
+    description = form.get("description", "").strip()
+    portions_raw = form.get("portions", "").strip()
+    pickup_location = form.get("pickup_location", "").strip()
+    pickup_start_raw = form.get("pickup_start", "").strip()
+    pickup_end_raw = form.get("pickup_end", "").strip()
+
+    required_fields = {
+        "Title": title,
+        "Portions": portions_raw,
+        "Pickup Location": pickup_location,
+        "Pickup Start": pickup_start_raw,
+        "Pickup End": pickup_end_raw,
+    }
+
+    for field_name, value in required_fields.items():
+        if not value:
+            return None, f"Please complete all required fields. Missing: {field_name}."
+
+    try:
+        portions = int(portions_raw)
+        if portions < 1 or portions > 100:
+            raise ValueError
+    except ValueError:
+        return None, "Portions must be an integer between 1 and 100."
+
+    try:
+        pickup_start = datetime.fromisoformat(pickup_start_raw)
+        pickup_end = datetime.fromisoformat(pickup_end_raw)
+    except ValueError:
+        return None, "Please provide valid dates and times for the pickup window."
+
+    if pickup_end < datetime.now():
+        return None, "Pickup end time cannot be in the past."
+
+    if pickup_end <= pickup_start:
+        return None, "Pickup end time must be after pickup start time."
+
+    data = {
+        "title": title,
+        "description": description if description else None,
+        "portions": portions,
+        "pickup_location": pickup_location,
+        "pickup_start": pickup_start,
+        "pickup_end": pickup_end,
+    }
+
+    return data, None
+
+
+def _resolve_dietary_tags(selected_tags):
+    # Resolve validated dietary tags
+    tags_to_attach = []
+    for tag_name in set(selected_tags):
+        tag_name_clean = tag_name.strip().lower()
+        if tag_name_clean in DEFAULT_DIETARY_TAGS:
+            tag = db.session.execute(
+                db.select(DietaryTag).filter_by(name=tag_name_clean)
+            ).scalar_one_or_none()
+            if not tag:
+                tag = DietaryTag(name=tag_name_clean)
+                db.session.add(tag)
+            tags_to_attach.append(tag)
+    return tags_to_attach
+
+
+def _get_owned_listing(listing_id, lock=False):
+    """Return the listing if the logged-in vendor owns it; otherwise stop with 404 or 403."""
+    query = db.select(Listing).filter_by(id=listing_id)
+    if lock:
+        # Same row lock reserve_listing() takes, so reservations wait until this request is done
+        query = query.with_for_update()
+    listing = db.session.execute(query).scalar_one_or_none()
+
+    if listing is None:
+        db.session.rollback()
+        abort(404)
+    if listing.vendor_id != current_user.id:
+        db.session.rollback()
+        abort(403)
+    return listing
 
 
 @vendor_bp.route("/vendor/listings", methods=["GET"])
@@ -28,82 +117,128 @@ def vendor_listings():
         .scalars()
         .all()
     )
-    return render_template("vendor/listings.html", listings=listings)
+    return render_template("vendor/my_listings.html", listings=listings)
+
+
+@vendor_bp.route("/vendor/listings/<int:listing_id>", methods=["GET"])
+@vendor_required
+def listing_detail(listing_id):
+    listing = _get_owned_listing(listing_id)
+
+    # Every reservation on this listing, oldest first, with its student loaded
+    reservations = (
+        db.session.execute(
+            db.select(Reservation)
+            .options(selectinload(Reservation.student))
+            .filter_by(listing_id=listing.id)
+            .order_by(Reservation.id)
+        )
+        .scalars()
+        .all()
+    )
+    return render_template(
+        "vendor/listing_detail.html",
+        listing=listing,
+        reservations=reservations,
+    )
+
+
+@vendor_bp.route("/vendor/listings/<int:listing_id>/edit", methods=["GET", "POST"])
+@vendor_required
+def edit_listing(listing_id):
+    # Only a POST changes data, so only a POST needs the row lock
+    listing = _get_owned_listing(listing_id, lock=request.method == "POST")
+
+    # Ended and cancelled listings are read-only
+    if listing.display_status != "active":
+        db.session.rollback()
+        flash("Only active listings can be edited.", "danger")
+        return redirect(url_for("vendor.vendor_listings"))
+
+    if request.method == "POST":
+        selected_tags = request.form.getlist("dietary_tags")
+        reserved = listing.reserved_portions
+        data, error = _validate_listing_form(request.form)
+
+        # Portion reduction guard
+        if error is None and data["portions"] < reserved:
+            error = f"Portions cannot be reduced below the {reserved} already reserved."
+
+        if error:
+            db.session.rollback()
+            flash(error, "danger")
+            return render_template(
+                "vendor/edit_listing.html",
+                listing=listing,
+                available_tags=DEFAULT_DIETARY_TAGS,
+                selected_tags=selected_tags,
+                form_data=request.form,
+            )
+
+        listing.title = data["title"]
+        listing.description = data["description"]
+        listing.total_portions = data["portions"]
+        listing.remaining_portions = data["portions"] - reserved
+        listing.pickup_location = data["pickup_location"]
+        listing.pickup_start = data["pickup_start"]
+        listing.pickup_end = data["pickup_end"]
+        listing.tags = _resolve_dietary_tags(selected_tags)
+        db.session.commit()
+
+        flash("Listing updated successfully!", "success")
+        return redirect(url_for("vendor.vendor_listings"))
+
+    # GET: pre-fill the form from the saved listing
+    form_data = {
+        "title": listing.title,
+        "description": listing.description or "",
+        "portions": listing.total_portions,
+        "pickup_location": listing.pickup_location,
+        "pickup_start": listing.pickup_start.strftime("%Y-%m-%dT%H:%M"),
+        "pickup_end": listing.pickup_end.strftime("%Y-%m-%dT%H:%M"),
+    }
+    return render_template(
+        "vendor/edit_listing.html",
+        listing=listing,
+        available_tags=DEFAULT_DIETARY_TAGS,
+        selected_tags=[tag.name for tag in listing.tags],
+        form_data=form_data,
+    )
+
+
+@vendor_bp.route("/vendor/listings/<int:listing_id>/cancel", methods=["POST"])
+@vendor_required
+def cancel_listing(listing_id):
+    listing = _get_owned_listing(listing_id, lock=True)
+
+    if listing.display_status != "active":
+        db.session.rollback()
+        flash("This listing can no longer be cancelled.", "danger")
+        return redirect(url_for("vendor.vendor_listings"))
+
+    listing.status = "cancelled"
+
+    # Cascade: cancel every active reservation and give its portions back
+    for reservation in listing.reservations:
+        if reservation.status == "active":
+            reservation.status = "cancelled"
+            listing.remaining_portions += reservation.portions_reserved
+
+    db.session.commit()
+
+    flash("Listing cancelled. Its active reservations were cancelled too.", "success")
+    return redirect(url_for("vendor.vendor_listings"))
 
 
 @vendor_bp.route("/listings/new", methods=["GET", "POST"])
 @vendor_required
 def new_listing():
     if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        description = request.form.get("description", "").strip()
-        portions_raw = request.form.get("portions", "").strip()
-        pickup_location = request.form.get("pickup_location", "").strip()
-        pickup_start_raw = request.form.get("pickup_start", "").strip()
-        pickup_end_raw = request.form.get("pickup_end", "").strip()
         selected_tags = request.form.getlist("dietary_tags")
+        data, error = _validate_listing_form(request.form)
 
-        # Validate required fields
-        required_fields = {
-            "Title": title,
-            "Portions": portions_raw,
-            "Pickup Location": pickup_location,
-            "Pickup Start": pickup_start_raw,
-            "Pickup End": pickup_end_raw,
-        }
-
-        for field_name, value in required_fields.items():
-            if not value:
-                flash(f"Please complete all required fields. Missing: {field_name}.", "danger")
-                return render_template(
-                    "vendor/new_listing.html",
-                    available_tags=DEFAULT_DIETARY_TAGS,
-                    selected_tags=selected_tags,
-                    form_data=request.form,
-                )
-
-        # Validate portions integer range between 1 and 100
-        try:
-            portions = int(portions_raw)
-            if portions < 1 or portions > 100:
-                raise ValueError
-        except ValueError:
-            flash("Portions must be an integer between 1 and 100.", "danger")
-            return render_template(
-                "vendor/new_listing.html",
-                available_tags=DEFAULT_DIETARY_TAGS,
-                selected_tags=selected_tags,
-                form_data=request.form,
-            )
-
-        # Parse pickup window start and end datetimes
-        try:
-            pickup_start = datetime.fromisoformat(pickup_start_raw)
-            pickup_end = datetime.fromisoformat(pickup_end_raw)
-        except ValueError:
-            flash("Please provide valid dates and times for the pickup window.", "danger")
-            return render_template(
-                "vendor/new_listing.html",
-                available_tags=DEFAULT_DIETARY_TAGS,
-                selected_tags=selected_tags,
-                form_data=request.form,
-            )
-
-        now = datetime.now()
-
-        # Pickup end cannot be in the past
-        if pickup_end < now:
-            flash("Pickup end time cannot be in the past.", "danger")
-            return render_template(
-                "vendor/new_listing.html",
-                available_tags=DEFAULT_DIETARY_TAGS,
-                selected_tags=selected_tags,
-                form_data=request.form,
-            )
-
-        # Pickup end cannot be before or equal to pickup start
-        if pickup_end <= pickup_start:
-            flash("Pickup end time must be after pickup start time.", "danger")
+        if error:
+            flash(error, "danger")
             return render_template(
                 "vendor/new_listing.html",
                 available_tags=DEFAULT_DIETARY_TAGS,
@@ -114,30 +249,17 @@ def new_listing():
         # Create new Listing record
         new_item = Listing(
             vendor_id=current_user.id,
-            title=title,
-            description=description if description else None,
-            total_portions=portions,
-            remaining_portions=portions,
-            pickup_location=pickup_location,
-            pickup_start=pickup_start,
-            pickup_end=pickup_end,
+            title=data["title"],
+            description=data["description"],
+            total_portions=data["portions"],
+            remaining_portions=data["portions"],
+            pickup_location=data["pickup_location"],
+            pickup_start=data["pickup_start"],
+            pickup_end=data["pickup_end"],
             status="active",
         )
 
-        # Resolve validated dietary tags
-        tags_to_attach = []
-        for tag_name in selected_tags:
-            tag_name_clean = tag_name.strip().lower()
-            if tag_name_clean in DEFAULT_DIETARY_TAGS:
-                tag = db.session.execute(
-                    db.select(DietaryTag).filter_by(name=tag_name_clean)
-                ).scalar_one_or_none()
-                if not tag:
-                    tag = DietaryTag(name=tag_name_clean)
-                    db.session.add(tag)
-                tags_to_attach.append(tag)
-
-        new_item.tags = tags_to_attach
+        new_item.tags = _resolve_dietary_tags(selected_tags)
         db.session.add(new_item)
         db.session.commit()
 

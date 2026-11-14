@@ -1,1 +1,135 @@
-{% extends "vendor/listings.html" %}
+{% extends "base.html" %}
+
+{% block title %}My Listings | CampusEats{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>My Surplus Food Listings</h1>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('vendor.confirm_pickup') }}" class="btn btn-outline-success">
+            Confirm Pickup
+        </a>
+        <a href="{{ url_for('vendor.new_listing') }}" class="btn btn-primary">
+            Post New Listing
+        </a>
+    </div>
+</div>
+
+{% if not listings %}
+    <div class="card p-5 text-center text-muted bg-white border-dashed">
+        <h3>No Food Listings Posted Yet</h3>
+        <p class="mb-3">You have not posted any surplus food listings. Post food to help students and prevent waste!</p>
+        <div>
+            <a href="{{ url_for('vendor.new_listing') }}" class="btn btn-outline-primary">
+                Post Your First Listing
+            </a>
+        </div>
+    </div>
+{% else %}
+    <div class="table-responsive bg-white rounded shadow-sm border">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Total</th>
+                    <th scope="col">Reserved</th>
+                    <th scope="col">Remaining</th>
+                    <th scope="col">Pickup Location</th>
+                    <th scope="col">Pickup Window</th>
+                    <th scope="col">Dietary Tags</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Rating & Reviews</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in listings %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('vendor.listing_detail', listing_id=item.id) }}" class="fw-bold">{{ item.title }}</a>
+                            {% if item.description %}
+                                <div class="text-muted small text-truncate" style="max-width: 280px;">
+                                    {{ item.description }}
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td class="portions-total">{{ item.total_portions }}</td>
+                        <td class="portions-reserved">{{ item.reserved_portions }}</td>
+                        <td class="portions-remaining">{% if item.display_status == 'cancelled' %}&mdash;{% else %}{{ item.remaining_portions }}{% endif %}</td>
+                    
+                        <td>{{ item.pickup_location }}</td>
+                        <td class="small">
+                            <div>{{ item.pickup_start.strftime('%b %d, %Y %I:%M %p') }}</div>
+                            <div class="text-muted">to {{ item.pickup_end.strftime('%b %d, %Y %I:%M %p') }}</div>
+                        </td>
+                        <td>
+                            {% for tag in item.tags %}
+                                <span class="badge bg-info text-dark">{{ tag.name | capitalize }}</span>
+                            {% else %}
+                                <span class="text-muted small">None</span>
+                            {% endfor %}
+                        </td>
+                        <td>
+                            {% if item.display_status == 'active' %}
+                                <span class="badge bg-success">Active</span>
+                            {% elif item.display_status == 'ended' %}
+                                <span class="badge bg-secondary">Ended</span>
+                            {% elif item.display_status == 'cancelled' %}
+                                <span class="badge bg-danger">Cancelled</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark">{{ item.display_status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.average_rating is not none %}
+                                <div>
+                                    <span class="text-warning">★</span>
+                                    <strong>{{ "%.1f"|format(item.average_rating) }}</strong> / 5.0
+                                    <span class="text-muted small">({{ item.ratings|length }})</span>
+                                </div>
+                            {% else %}
+                                <div class="text-muted small">No ratings yet</div>
+                            {% endif %}
+
+                            {% if item.reviews_with_comments %}
+                                <div class="mt-1">
+                                    <details>
+                                        <summary class="small text-primary" style="cursor: pointer;">
+                                            {{ item.reviews_with_comments|length }} review comment{% if item.reviews_with_comments|length != 1 %}s{% endif %}
+                                        </summary>
+                                        <ul class="list-unstyled small mt-2 mb-0 border-top pt-2" style="max-width: 320px;">
+                                            {% for r in item.reviews_with_comments %}
+                                                <li class="mb-2 text-wrap text-break">
+                                                    <span class="badge bg-warning text-dark">{{ r.stars }} ★</span>
+                                                    {% if r.created_at %}
+                                                        <span class="text-muted small">({{ r.created_at.strftime('%b %d, %Y') }}):</span>
+                                                    {% endif %}
+                                                    <span class="fst-italic">"{{ r.comment }}"</span>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </details>
+                                </div>
+                            {% else %}
+                                <div class="text-muted small">No comments</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap">
+                            <a href="{{ url_for('vendor.listing_detail', listing_id=item.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                            {% if item.display_status == 'active' %}
+                                <a href="{{ url_for('vendor.edit_listing', listing_id=item.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                <form method="post"
+                                      action="{{ url_for('vendor.cancel_listing', listing_id=item.id) }}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Cancel this listing? Its active reservations will be cancelled too.');">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Cancel</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+{% endblock %}

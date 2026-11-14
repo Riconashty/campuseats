@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from campuseats.extensions import db
 
 DEFAULT_DIETARY_TAGS = (
@@ -66,6 +68,16 @@ class Listing(db.Model):
         secondary=listing_dietary_tags,
         backref=db.backref("listings", lazy="dynamic"),
     )
+
+    @property
+    def reserved_portions(self):
+        return self.total_portions - self.remaining_portions
+
+    @property
+    def display_status(self):
+        if self.status == "active" and self.pickup_end <= datetime.now():
+            return "ended"
+        return self.status
 
     @property
     def ratings(self):
