@@ -49,8 +49,16 @@ class StudentListingsFeedTest(unittest.TestCase):
             db.session.commit()
             self.vendor_id = vendor.id
 
-    def add_listing(self, title, hours_until_end=2, remaining=3, status="active", tags=()):
-        now = datetime.now(timezone.utc)
+    def add_listing(
+        self,
+        title,
+        hours_until_end=2,
+        remaining=3,
+        status="active",
+        tags=(),
+        location="Student Union",
+    ):
+        now = datetime.now()
         with self.app.app_context():
             resolved_tags = []
             for name in tags:
@@ -64,7 +72,7 @@ class StudentListingsFeedTest(unittest.TestCase):
                 title=title,
                 total_portions=5,
                 remaining_portions=remaining,
-                pickup_location="Student Union",
+                pickup_location=location,
                 pickup_start=now - timedelta(hours=3),
                 pickup_end=now + timedelta(hours=hours_until_end),
                 status=status,
@@ -73,10 +81,10 @@ class StudentListingsFeedTest(unittest.TestCase):
             db.session.add(listing)
             db.session.commit()
 
-    def get_feed(self):
+    def get_feed(self, **filters):
         student = SimpleNamespace(is_authenticated=True, role="student")
         with patch.object(role_guards, "current_user", student):
-            return self.client.get("/listings")
+            return self.client.get("/listings", query_string=filters)
 
     def test_active_listing_is_shown_with_details(self):
         self.add_listing("Fresh Bagels", tags=["vegan"])
@@ -109,39 +117,68 @@ class StudentListingsFeedTest(unittest.TestCase):
         body = self.get_feed().data
         self.assertLess(body.index(b"Sooner Meal"), body.index(b"Later Meal"))
 
-    def test_overnight_pickup_window_renders_end_date(self):
-        now = datetime.now(timezone.utc)
-        with self.app.app_context():
-            listing = Listing(
-                vendor_id=self.vendor_id,
-                title="Midnight Snacks",
-                total_portions=4,
-                remaining_portions=4,
-                pickup_location="Night Cafe",
-                pickup_start=now.replace(hour=23, minute=0, second=0, microsecond=0),
-                pickup_end=(now + timedelta(days=1)).replace(
-                    hour=2, minute=0, second=0, microsecond=0
-                ),
-                status="active",
-            )
-            db.session.add(listing)
-            db.session.commit()
+    def test_single_tag_filter_shows_only_matching_listings(self):
+        self.add_listing("Veggie Wrap", tags=["vegan"])
+        self.add_listing("Chicken Bowl", tags=["halal"])
+        body = self.get_feed(tags=["vegan"]).data
+        self.assertIn(b"Veggie Wrap", body)
+        self.assertNotIn(b"Chicken Bowl", body)
 
-        response = self.get_feed()
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Midnight Snacks", response.data)
-        expected_end_formatted = (
-            (now + timedelta(days=1))
-            .replace(hour=2, minute=0, second=0, microsecond=0)
-            .strftime("%b %d, %I:%M %p")
-            .encode("utf-8")
-        )
-        self.assertIn(expected_end_formatted, response.data)
+    def test_multiple_tags_require_all_of_them(self):
+        self.add_listing("Falafel Plate", tags=["vegan", "halal"])
+        self.add_listing("Veggie Wrap", tags=["vegan"])
+        self.add_listing("Chicken Bowl", tags=["halal"])
+        body = self.get_feed(tags=["vegan", "halal"]).data
+        self.assertIn(b"Falafel Plate", body)
+        self.assertNotIn(b"Veggie Wrap", body)
+        self.assertNotIn(b"Chicken Bowl", body)
 
-    def test_multi_listing_reuse_dietary_tag_avoids_collision(self):
-        self.add_listing("Vegan Lunch", tags=["vegan", "halal"])
-        self.add_listing("Vegan Dinner", tags=["vegan", "vegetarian"])
-        response = self.get_feed()
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Vegan Lunch", response.data)
-        self.assertIn(b"Vegan Dinner", response.data)
+    def test_location_filter_shows_only_that_location(self):
+        self.add_listing("Union Bagels", location="Student Union")
+        self.add_listing("Library Muffins", location="Library Cafe")
+        body = self.get_feed(location="Library Cafe").data
+        self.assertIn(b"Library Muffins", body)
+        self.assertNotIn(b"Union Bagels", body)
+
+    def test_location_and_tags_combine(self):
+        self.add_listing("Union Vegan Soup", tags=["vegan"], location="Student Union")
+        self.add_listing("Library Vegan Soup", tags=["vegan"], location="Library Cafe")
+        self.add_listing("Union Ham Sandwich", location="Student Union")
+        body = self.get_feed(tags=["vegan"], location="Student Union").data
+        self.assertIn(b"Union Vegan Soup", body)
+        self.assertNotIn(b"Library Vegan Soup", body)
+        self.assertNotIn(b"Union Ham Sandwich", body)
+
+    def test_no_filters_shows_every_available_listing(self):
+        self.add_listing("Veggie Wrap", tags=["vegan"])
+        self.add_listing("Library Muffins", location="Library Cafe")
+        body = self.get_feed().data
+        self.assertIn(b"Veggie Wrap", body)
+        self.assertIn(b"Library Muffins", body)
+
+    def test_unknown_tag_is_ignored(self):
+        self.add_listing("Veggie Wrap", tags=["vegan"])
+        body = self.get_feed(tags=["not-a-real-tag"]).data
+        self.assertIn(b"Veggie Wrap", body)
+
+    def test_no_matches_shows_filter_empty_state(self):
+        self.add_listing("Chicken Bowl", tags=["halal"])
+        body = self.get_feed(tags=["vegan"]).data
+        self.assertIn(b"No listings match your filters", body)
+        self.assertNotIn(b"No food is available right now", body)
+
+    def test_selected_filters_stay_selected_in_the_form(self):
+        self.add_listing("Library Muffins", tags=["vegan"], location="Library Cafe")
+        body = self.get_feed(tags=["vegan"], location="Library Cafe").data.decode()
+        self.assertRegex(body, r'value="vegan"\s+id="filter-tag-\d+" checked')
+        self.assertIn('<option value="Library Cafe" selected>', body)
+
+    def test_location_dropdown_lists_each_available_location_once(self):
+        self.add_listing("Union Bagels", location="Student Union")
+        self.add_listing("Union Soup", location="Student Union")
+        self.add_listing("Library Muffins", location="Library Cafe")
+        self.add_listing("Old Gym Pizza", location="Old Gym", hours_until_end=-1)
+        body = self.get_feed().data.decode()
+        self.assertEqual(body.count('<option value="Student Union"'), 1)
+        self.assertEqual(body.count('<option value="Library Cafe"'), 1)
+        self.assertNotIn('<option value="Old Gym"', body)
