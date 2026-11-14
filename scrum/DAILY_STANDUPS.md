@@ -1,3 +1,18 @@
+## Daily Standup Bot Message 
+```
+🌅 Daily Standup — <date>
+Good morning team! Please post your daily update in the thread attached below:
+
+• Yesterday: What tasks or goals did you accomplish?
+• Today: What will you be working on today?
+• Blockers: Is anything blocking you or do you need assistance?
+
+If you are not working today, please respond with 'Not working' or an emoji.
+
+Please respond by 3:00pm today.•10/20/26, 8:30 AM
+```
+
+
 # Sprint 0
 
 ---
