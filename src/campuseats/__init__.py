@@ -4,7 +4,7 @@ from campuseats.config import Config
 from campuseats.routes.main import main_bp
 from campuseats.routes.student import student_bp
 from campuseats.extensions import db, login_manager
-from campuseats.models import DietaryTag, Listing, Reservation, User
+from campuseats.models import DietaryTag, Listing, Rating, Reservation, User
 from campuseats.routes.auth import auth_bp
 from campuseats.routes.vendor import vendor_bp
 from campuseats.seed import seed_database
