@@ -1,0 +1,42 @@
+@startuml US1
+
+autonumber
+
+actor User
+participant Browser
+participant "auth routes\n(Flask)" as Route
+participant "User model\n(SQLAlchemy)" as Model
+database PostgreSQL as DB
+
+== Register ==
+
+User -> Browser : fill in name, email, password role;\nclick "Register"
+Browser -> Route : POST /register
+
+alt a required field is empty or password is under 8 characters
+    Route -> Browser : re-render form, mark the field with the problem
+else all fields valid
+    Route -> Model : find user by email
+    Model -> DB : SELECT * FROM users WHERE email = ?
+    DB --> Model : matching row or nothing
+    Model --> Route : User or None
+end
+
+== Log in ==
+User -> Browser : fill in email, password;\nclick "Log in"
+Browser -> Route : POST /login
+Route -> Model : find user by email
+Model -> DB : SELECT * FROM users WHERE email = ?
+DB --> Model : matching row or nothing
+Model --> Route : User or None
+
+alt credentials exists
+    Route -> Route : Login_user(user)
+    Route -> Browser : redirect to home page for user's role
+    Model -> User : Display error message, redirect to sign in
+else wrong credentials
+    Route -> Browser : Display error message, redirect to sign in
+end
+
+
+@enduml
