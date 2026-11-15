@@ -126,6 +126,9 @@ class MyReservationsTest(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].endswith("/student/reservations"))
         self.assertEqual(self.state(rid, lid), ("cancelled", 3))
+        with self.app.app_context():
+            res = db.session.get(Reservation, rid)
+            self.assertEqual(res.cancellation_reason, "Cancelled by student")
 
     def test_cancelling_twice_does_not_release_portions_twice(self):
         rid, lid = self.make_reservation(self.alice_id, "AAAAAA", portions=1, remaining=1)
@@ -189,3 +192,38 @@ class MyReservationsTest(unittest.TestCase):
     def test_logged_out_user_is_forbidden(self):
         self.assertEqual(self.client.get("/student/reservations").status_code, 403)
         self.assertEqual(self.client.post(self.cancel_url(1)).status_code, 403)
+
+    def test_vendor_cancelled_reservation_displays_badge_and_struck_pickup_code(self):
+        from campuseats.routes import vendor as vendor_routes
+
+        rid, lid = self.make_reservation(self.alice_id, "AAAAAA", portions=1)
+        fake_vendor = SimpleNamespace(id=self.vendor_id, is_authenticated=True, role="vendor")
+        with (
+            patch.object(role_guards, "current_user", fake_vendor),
+            patch.object(vendor_routes, "current_user", fake_vendor),
+        ):
+            cancel_res = self.client.post(f"/vendor/listings/{lid}/cancel")
+            self.assertEqual(cancel_res.status_code, 302)
+
+        self.login_as(self.alice_id)
+        response = self.client.get("/student/reservations")
+        self.assertEqual(response.status_code, 200)
+        body = response.data.decode("utf-8")
+        self.assertIn("Cancelled by Vendor", body)
+        self.assertIn(
+            '<del class="text-muted"><code class="fs-6 text-muted">AAAAAA</code></del>', body
+        )
+        self.assertNotIn(self.cancel_url(rid), body)
+
+    def test_student_cancelled_reservation_displays_struck_pickup_code(self):
+        rid, _ = self.make_reservation(self.alice_id, "BBBBBB", portions=1)
+        self.login_as(self.alice_id)
+        self.client.post(self.cancel_url(rid))
+        response = self.client.get("/student/reservations")
+        self.assertEqual(response.status_code, 200)
+        body = response.data.decode("utf-8")
+        self.assertIn(
+            '<del class="text-muted"><code class="fs-6 text-muted">BBBBBB</code></del>', body
+        )
+        self.assertIn("cancelled", body)
+        self.assertNotIn("Cancelled by Vendor", body)

@@ -28,6 +28,8 @@ def generate_unique_pickup_code(session, length=6):
 
 class Reservation(db.Model):
     __tablename__ = "reservations"
+    CANCELLATION_REASON_VENDOR = "Cancelled by vendor"
+
     __table_args__ = (
         db.CheckConstraint(
             "portions_reserved >= 1 AND portions_reserved <= 2",
@@ -54,6 +56,7 @@ class Reservation(db.Model):
         default="active",
         server_default="active",
     )
+    cancellation_reason = db.Column(db.String(100), nullable=True)
     created_at = db.Column(
         db.DateTime(timezone=True),
         nullable=False,
