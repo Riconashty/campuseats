@@ -36,6 +36,7 @@ from .browser import (
     log_out,
     register,
     require_live_server,
+    scroll_into_view,
     start_chrome,
     wait_for,
 )
@@ -323,9 +324,7 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
                         card.find_element(By.CSS_SELECTOR, "select[name='portions']")
                     ).select_by_value("1")
                     button = card.find_element(By.CSS_SELECTOR, "button.reserve-submit-btn")
-                    browser.execute_script(
-                        "arguments[0].scrollIntoView({block: 'center'});", button
-                    )
+                    scroll_into_view(browser, button)
                     buttons.append(button)
 
                 # Release both clicks together

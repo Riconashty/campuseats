@@ -90,9 +90,21 @@ def wait_for(driver, condition, message=""):
     return WebDriverWait(driver, WAIT_SECONDS).until(condition, message)
 
 
+def scroll_into_view(driver, element):
+    """Bring an element to the middle of the window immediately.
+
+    Bootstrap sets `scroll-behavior: smooth`, which turns a plain scrollIntoView() into an
+    animation. A click sent while the page is still moving misses the element, so the
+    scroll has to be instant.
+    """
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});", element
+    )
+
+
 def click(driver, element):
     """Scroll an element into view and click it the way a user would."""
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+    scroll_into_view(driver, element)
     element.click()
 
 
