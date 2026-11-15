@@ -1,5 +1,0 @@
-Date/Time: 
-
-Participants: 
-
-Notes...

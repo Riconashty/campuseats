@@ -10,7 +10,7 @@ database PostgreSQL as DB
 
 == Register ==
 
-User -> Browser : fill in name, email, password role;\nclick "Register"
+User -> Browser : fill in name, email, password, role;\nclick "Register"
 Browser -> Route : POST /register
 
 alt a required field is empty or password is under 8 characters
@@ -33,7 +33,6 @@ Model --> Route : User or None
 alt credentials exists
     Route -> Route : Login_user(user)
     Route -> Browser : redirect to home page for user's role
-    Model -> User : Display error message, redirect to sign in
 else wrong credentials
     Route -> Browser : Display error message, redirect to sign in
 end
