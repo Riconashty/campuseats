@@ -6,9 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from campuseats.extensions import db
-from campuseats.models.listing import Listing
-from campuseats.models.rating import Rating
 from campuseats.models.listing import DEFAULT_DIETARY_TAGS, DietaryTag, Listing
+from campuseats.models.rating import Rating
 from campuseats.models.reservation import Reservation, generate_unique_pickup_code
 from campuseats.routes.role_guards import student_required
 
