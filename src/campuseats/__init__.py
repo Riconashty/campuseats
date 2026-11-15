@@ -2,9 +2,12 @@ from flask import Flask
 from sqlalchemy import text
 from campuseats.config import Config
 from campuseats.routes.main import main_bp
+from campuseats.routes.student import student_bp
 from campuseats.extensions import db, login_manager
-from campuseats.models.user import User
+from campuseats.models import DietaryTag, Listing, Reservation, User
 from campuseats.routes.auth import auth_bp
+from campuseats.routes.vendor import vendor_bp
+from campuseats.seed import seed_database
 
 
 def create_app(config_class=Config):
@@ -29,9 +32,15 @@ def create_app(config_class=Config):
     app.register_blueprint(main_bp)
     # include the auth blueprint for authentication routes
     app.register_blueprint(auth_bp)
+    # include the vendor blueprint for vendor routes
+    app.register_blueprint(vendor_bp)
+    # include the student blueprint for student browse and reservation routes
+    app.register_blueprint(student_bp)
 
     with app.app_context():
         db.session.execute(text("SELECT 1"))  # fails loudly if the DB is unreachable
         db.create_all()  # builds tables for any models (none exist yet)
+        if app.config.get("SEED_DEMO_USERS"):
+            seed_database()
 
     return app

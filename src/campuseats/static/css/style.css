@@ -1,0 +1,96 @@
+/* CampusEats Theme: Modern, Clean, Elegant Food Rescue Styling */
+
+:root {
+    --ce-primary: #198754;
+    --ce-primary-dark: #0f5132;
+    --ce-primary-light: #d1e7dd;
+    --ce-surface: #ffffff;
+    --ce-bg: #f8f9fa;
+    --ce-border: #e9ecef;
+}
+
+/* Card Elevation & Structure */
+.listing-card {
+    transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    border-radius: 0.85rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background-color: var(--ce-surface);
+}
+
+.listing-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
+}
+
+.listing-card .card-body {
+    padding: 1.35rem;
+}
+
+.listing-card .card-footer {
+    padding: 1rem 1.35rem;
+    border-top: 1px solid var(--ce-border);
+}
+
+/* Dietary and Inventory Badges */
+.dietary-tag-badge {
+    background-color: var(--ce-primary-light);
+    color: var(--ce-primary-dark);
+    font-weight: 500;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 2rem;
+    display: inline-block;
+    letter-spacing: 0.01em;
+}
+
+.portions-badge {
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.5rem;
+}
+
+/* Pickup Code Presentation */
+.pickup-code-card {
+    background: linear-gradient(145deg, #f0fdf4, #e8f5e9);
+    border: 2px dashed #198754;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.pickup-code-badge {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: 0.35rem;
+    color: var(--ce-primary-dark);
+    padding: 0.5rem 1rem;
+    display: inline-block;
+}
+
+.pickup-details-list dt {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+}
+
+.pickup-details-list dd {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #212529;
+    margin-bottom: 0.75rem;
+}
+
+/* Modal Polish */
+.modal-pickup-dialog {
+    border-radius: 1rem;
+    overflow: hidden;
+    border: none;
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+}
+
+.modal-backdrop.show {
+    opacity: 0.5;
+}

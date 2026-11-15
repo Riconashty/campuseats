@@ -10,8 +10,16 @@
             CampusEats connects campus food vendors with students to ensure leftover food is enjoyed rather than thrown away, reducing waste and hunger on campus.
         </p>
         <div class="d-flex gap-3 mt-4">
-            <button class="btn btn-success btn-lg px-4" type="button" disabled>Browse Listings</button>
-            <button class="btn btn-outline-secondary btn-lg px-4" type="button" disabled>Vendor Portal</button>
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'student' %}
+                    <a href="{{ url_for('student.listings') }}" class="btn btn-success btn-lg px-4">Browse Listings</a>
+                {% elif current_user.role == 'vendor' %}
+                    <a href="{{ url_for('vendor.vendor_listings') }}" class="btn btn-success btn-lg px-4">Vendor Portal</a>
+                {% endif %}
+            {% else %}
+                <a href="{{ url_for('auth.login') }}" class="btn btn-success btn-lg px-4">Browse Listings</a>
+                <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary btn-lg px-4">Vendor Portal</a>
+            {% endif %}
         </div>
     </div>
 </div>
