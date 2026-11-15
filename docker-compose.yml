@@ -28,6 +28,7 @@ services:
       FLASK_DEBUG: 0
       SEED_DEMO_USERS: "true"
     ports:
+      - "5000:5001"
       - "5001:5001"
     depends_on:
       db:

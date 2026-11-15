@@ -4,6 +4,17 @@ CampusEats connects campus food vendors that have leftover food with students wh
 
 ---
 
+## Team
+- [Tyler Black](https://github.com/khakis23)
+- [Riley Drenth](https://github.com/RileyDrenthMSU)
+- [Cameron Greeson](https://github.com/GreesonC)
+- [Richard Hall](https://github.com/Riconashty)
+- [Stephanie Rivera-Martinez](https://github.com/FrostyBagels)
+
+### SCRUM Master
+[Riley Drenth](https://github.com/RileyDrenthMSU)
+
+
 ## Running with Docker Compose
 
 The entire application (Flask web server + PostgreSQL database) can be started with a single command from the repository root:
@@ -18,7 +29,7 @@ docker compose up --build
 docker compose up
 ```
 
-Once started, open `http://localhost:5001` in your browser.
+Once started, open `http://localhost:5000` (or `http://localhost:5001`) in your browser.
 
 ### Automatic Seed Accounts
 On first launch, the database automatically initializes the schema and creates demo accounts for grading (enabled by default in Docker and `.env.example` via `SEED_DEMO_USERS=true`):
