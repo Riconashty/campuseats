@@ -33,11 +33,17 @@
                                 <a class="nav-link" href="{{ url_for('vendor.vendor_listings') }}">My Listings</a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('vendor.confirm_pickup') }}">Confirm Pickup</a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('vendor.new_listing') }}">Post Listing</a>
                             </li>
                         {% elif current_user.role == 'student' %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('student.listings') }}">Browse Listings</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('student.my_reservations') }}">My Reservations</a>
                             </li>
                         {% endif %}
                         <li class="nav-item">

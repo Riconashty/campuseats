@@ -182,7 +182,7 @@ class ListingsTestCase(unittest.TestCase):
         # Check that overview page displays the created listing
         overview_res = self.client.get("/vendor/listings")
         self.assertIn(b"Fresh Fruit &amp; Sandwiches", overview_res.data)
-        self.assertIn(b"15 / 15", overview_res.data)
+        self.assertIn(b'<td class="portions-remaining">15</td>', overview_res.data)
 
     # Verify posting without description succeeds and stores empty description as None
     def test_post_listing_optional_description(self):

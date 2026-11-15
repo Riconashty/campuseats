@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}My Reservations - CampusEats{% endblock %}
+
+{% block content %}
+{% set badge_colors = {'active': 'success', 'picked up': 'primary', 'cancelled': 'secondary', 'no-show': 'danger'} %}
+
+<h1 class="mb-4 fw-bold text-success">My Reservations</h1>
+
+{% if reservations %}
+<div class="table-responsive bg-white rounded-3 shadow-sm border">
+  <table class="table align-middle mb-0">
+    <thead>
+      <tr>
+        <th>Listing</th>
+        <th>Vendor</th>
+        <th>Pickup location</th>
+        <th>Pickup window</th>
+        <th>Portions</th>
+        <th>Pickup code</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reservations %}
+      <tr>
+        <td>{{ r.listing.title }}</td>
+        <td>{{ r.listing.vendor.name }}</td>
+        <td>{{ r.listing.pickup_location }}</td>
+        <td>
+            {{ r.listing.pickup_start.strftime('%b %d, %I:%M %p') }} to
+            {{ r.listing.pickup_end.strftime('%b %d, %I:%M %p') }}
+        </td>
+        <td>{{ r.portions_reserved }}</td>
+        <td><code class="fs-6">{{ r.pickup_code }}</code></td>
+        <td>
+          <span class="badge bg-{{ badge_colors.get(r.status, 'secondary') }}">{{ r.status }}</span>
+        </td>
+        <td class="text-end">
+          {% if r.status == 'active' and r.listing.pickup_end > now %}
+          <form method="post"
+                action="{{ url_for('student.cancel_reservation', reservation_id=r.id) }}"
+                onsubmit="return confirm('Cancel this reservation?');">
+            <button type="submit" class="btn btn-outline-danger btn-sm">Cancel</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="alert alert-info text-center">
+  You have no reservations yet.
+  <a href="{{ url_for('student.listings') }}" class="alert-link">Browse available listings</a>.
+</div>
+{% endif %}
+{% endblock %}

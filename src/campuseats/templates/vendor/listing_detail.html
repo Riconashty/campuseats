@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}{{ listing.title }} | CampusEats{% endblock %}
+
+{% block content %}
+{% set badge_colors = {'active': 'success', 'picked up': 'primary', 'cancelled': 'secondary', 'no-show': 'danger'} %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">{{ listing.title }}</h1>
+    <a href="{{ url_for('vendor.vendor_listings') }}" class="btn btn-outline-secondary">Back to My Listings</a>
+</div>
+
+<p class="text-muted">
+    Status: <strong>{{ listing.display_status | capitalize }}</strong> &middot;
+    Total: <strong>{{ listing.total_portions }}</strong> &middot;
+    Reserved: <strong>{{ listing.reserved_portions }}</strong> &middot;
+    Remaining: <strong>{{ listing.remaining_portions }}</strong>
+</p>
+
+<h2 class="h4 mt-4">Reservations</h2>
+{% if reservations %}
+<div class="table-responsive bg-white rounded shadow-sm border">
+    <table class="table align-middle mb-0">
+        <thead class="table-light">
+            <tr>
+                <th scope="col">Student</th>
+                <th scope="col">Email</th>
+                <th scope="col">Portions Reserved</th>
+                <th scope="col">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for res in reservations %}
+            <tr>
+                <td>{{ res.student.name }}</td>
+                <td>{{ res.student.email }}</td>
+                <td>{{ res.portions_reserved }}</td>
+                <td><span class="badge bg-{{ badge_colors.get(res.status, 'secondary') }}">{{ res.status | capitalize }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">No students have reserved this listing yet.</div>
+{% endif %}
+{% endblock %}
