@@ -1,465 +1,383 @@
+"""Selenium black box test for US4: Reserve portions.
+
+This is the team's automated story. It covers every US4 acceptance criterion by driving
+the running Docker Compose deployment through headless Chrome:
+
+    AC1  reserving 1 or 2 portions stores a reservation, lowers the listing's remaining
+         portions by that amount, and shows a unique 6-character pickup code
+    AC2  asking for more portions than remain creates no reservation and shows an error
+    AC3  a second reservation on a listing the student already holds is refused
+    AC4  when two students reserve the last portion at the same moment only one succeeds,
+         and remaining portions never go below zero
+
+Run it with ./scripts/run-selenium.sh while `docker compose up` is running.
+
+The test only uses the browser. It creates its own vendor and student accounts through
+the registration page, posts its own listings, and cancels those listings through the
+vendor's My Listings page when it finishes, so nothing it made is left in the student
+feed. The test accounts themselves stay behind; `docker compose down -v` gives a clean
+database again.
+"""
+
 from datetime import datetime, timedelta
-import os
-import re
 import sys
+import threading
 import unittest
-import urllib.error
-import urllib.request
 import uuid
 
-from selenium import webdriver
-from selenium.common.exceptions import WebDriverException
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import Select, WebDriverWait
+from selenium.webdriver.support.ui import Select
 
-BASE_URL = os.environ.get("BASE_URL", "http://localhost:5001").rstrip("/")
+from .browser import (
+    BASE_URL,
+    click,
+    log_in,
+    log_out,
+    register,
+    require_live_server,
+    start_chrome,
+    wait_for,
+)
+
+PASSWORD = "SeleniumPass123!"
+PICKUP_LOCATION = "Student Union Room 101"
+SIMULTANEOUS_ROUNDS = 3
 
 
-def is_server_reachable(target_url, timeout=1.5):
-    """Check if the live HTTP web server is reachable before launching browser tests."""
-    try:
-        request = urllib.request.Request(
-            f"{target_url}/",
-            headers={"User-Agent": "Mozilla/5.0 (Automated Black Box Test)"},
-        )
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.status in (200, 301, 302, 404)
-    except Exception:
-        return False
-
-
-def print_status_banner(is_running):
-    """Print visual diagnostics distinguishing running vs skipped test executions."""
-    border = "=" * 72
-    if is_running:
-        message = (
-            f"\n{border}\n"
-            " CampusEats Selenium Black Box Tests: RUNNING\n"
-            f" Target Endpoint: {BASE_URL} (Headless Chrome)\n"
-            " Scope: User Story 4 (Reserve Portions) Acceptance Criteria\n"
-            f"{border}\n"
-        )
-    else:
-        message = (
-            f"\n{border}\n"
-            " CampusEats Selenium Black Box Tests: SKIPPED\n"
-            f" Target Endpoint: {BASE_URL}\n"
-            " Status: Live application server is not currently reachable.\n"
-            " How to run these tests:\n"
-            "   Start app via Docker: 'docker compose up'\n"
-            "   OR locally:          './scripts/start-db.sh && python run.py'\n"
-            "   Then execute:        './scripts/run-selenium.sh'\n"
-            f"{border}\n"
-        )
-    print(message, file=sys.stderr)
+def card_xpath(title):
+    return f"//div[contains(@class, 'listing-card')][.//h5[normalize-space()='{title}']]"
 
 
 class TestUS4SeleniumBlackBox(unittest.TestCase):
-    """Automated black box browser test suite for US4 (Student Portion Reservation)."""
+    """Automated black box browser test suite for US4 (Reserve portions)."""
 
     driver = None
-    created_listing_titles = []
-    created_user_emails = []
-
-    @classmethod
-    def cleanup_test_database(cls, app=None):
-        """Clean up test listings, reservations, and orphaned test users from the database."""
-        try:
-            if app is None:
-                from campuseats import create_app
-                from campuseats.config import Config
-
-                app = create_app(Config)
-
-            from campuseats.extensions import db
-            from campuseats.models.listing import Listing
-            from campuseats.models.reservation import Reservation
-            from campuseats.models.user import User
-
-            with app.app_context():
-                # Guard against running database cleanup against unintended environments
-                db_url = str(db.engine.url).lower()
-                is_safe_env = (
-                    app.config.get("TESTING", False)
-                    or "localhost" in db_url
-                    or "127.0.0.1" in db_url
-                    or ":memory:" in db_url
-                    or "campuseats_test" in db_url
-                )
-                if not is_safe_env:
-                    print(
-                        f"Warning: Selenium DB cleanup skipped for safety (unrecognized target: {db_url})",
-                        file=sys.stderr,
-                    )
-                    return
-
-                # Sweep both tracked listing titles and orphaned test listings matching patterns
-                patterns = [
-                    "Fresh Sandwiches %",
-                    "Last Bagel %",
-                    "Pasta Trays %",
-                    "Last Muffin %",
-                ]
-                filters = [Listing.title.like(p) for p in patterns]
-                if cls.created_listing_titles:
-                    filters.append(Listing.title.in_(cls.created_listing_titles))
-
-                listings_to_delete = (
-                    db.session.execute(db.select(Listing).filter(db.or_(*filters))).scalars().all()
-                )
-                for listing in listings_to_delete:
-                    db.session.execute(db.delete(Reservation).filter_by(listing_id=listing.id))
-                    db.session.delete(listing)
-
-                # Remove ephemeral test accounts created during selenium test executions
-                # Underscore is explicitly escaped so LIKE matches literal underscores rather than any single character
-                user_patterns = [
-                    r"selenium\_us4\_%",
-                    r"vendor\_%@campuseats.edu",
-                    r"student\_%@campuseats.edu",
-                    r"student1\_%@campuseats.edu",
-                    r"student2\_%@campuseats.edu",
-                ]
-                user_filters = [User.email.like(p, escape="\\") for p in user_patterns]
-                if cls.created_user_emails:
-                    user_filters.append(User.email.in_(cls.created_user_emails))
-
-                test_users = (
-                    db.session.execute(db.select(User).filter(db.or_(*user_filters)))
-                    .scalars()
-                    .all()
-                )
-                for user in test_users:
-                    db.session.delete(user)
-
-                db.session.commit()
-        except Exception as exc:
-            print(
-                f"Warning: Selenium DB cleanup skipped or encountered error: {exc}",
-                file=sys.stderr,
-            )
+    extra_drivers = []
+    vendor_email = None
+    listing_titles = []
 
     @classmethod
     def setUpClass(cls):
-        """Verify server readiness, initialize headless Chrome, and establish session."""
-        if not is_server_reachable(BASE_URL):
-            print_status_banner(is_running=False)
-            raise unittest.SkipTest(
-                f"CampusEats server unreachable at {BASE_URL}. "
-                "Start the server with 'docker compose up' or 'python run.py' to run Selenium tests."
-            )
+        require_live_server("User Story 4 (Reserve Portions) Acceptance Criteria")
+        cls.driver = start_chrome()
+        cls.extra_drivers = []
+        cls.listing_titles = []
+        cls.run_id = uuid.uuid4().hex[:8]
 
-        print_status_banner(is_running=True)
-
-        # Clean up any orphaned test data from previously interrupted test runs
-        cls.cleanup_test_database()
-
-        chrome_options = Options()
-        chrome_options.add_argument("--headless=new")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920,1080")
-
-        try:
-            cls.driver = webdriver.Chrome(options=chrome_options)
-            cls.driver.implicitly_wait(5)
-        except WebDriverException as exc:
-            raise unittest.SkipTest(f"Headless Chrome could not be initialized: {exc}")
+        # One vendor account owns every listing this run creates
+        cls.vendor_email = f"selenium_us4_vendor_{cls.run_id}@campuseats.edu"
+        register(cls.driver, "Selenium Test Kitchen", cls.vendor_email, PASSWORD, "vendor")
 
     @classmethod
     def tearDownClass(cls):
-        """Shut down browser session and remove test listings and reservations."""
-        cls.cleanup_test_database()
-        if cls.driver:
-            cls.driver.quit()
+        try:
+            if cls.driver and cls.listing_titles:
+                cls.cancel_listings_as_vendor()
+        except Exception as exc:
+            # Tidying up is not one of the acceptance criteria, so report it without
+            # turning a passing run into a failing one
+            print(f"Warning: could not cancel every Selenium test listing: {exc}", file=sys.stderr)
+        finally:
+            for driver in [cls.driver, *cls.extra_drivers]:
+                if driver:
+                    driver.quit()
+
+    @classmethod
+    def cancel_listings_as_vendor(cls):
+        """Tidy up through the UI: cancel this run's listings so students no longer see them."""
+        driver = cls.driver
+        log_out(driver)
+        log_in(driver, cls.vendor_email, PASSWORD)
+        for title in cls.listing_titles:
+            driver.get(f"{BASE_URL}/vendor/listings")
+            cancel_buttons = driver.find_elements(
+                By.XPATH,
+                f"//tr[.//a[normalize-space()='{title}']]"
+                "//form[contains(@action, '/cancel')]//button",
+            )
+            if not cancel_buttons:
+                continue
+            click(driver, cancel_buttons[0])
+            wait_for(driver, EC.alert_is_present(), "no confirmation dialog for cancel")
+            driver.switch_to.alert.accept()
+            wait_for(
+                driver,
+                EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-success")),
+                f"listing '{title}' was not cancelled",
+            )
 
     def setUp(self):
-        """Clear cookies before each test method to guarantee a clean, unauthenticated session."""
-        if self.driver:
-            self.driver.delete_all_cookies()
+        # Every test starts logged out in the main browser
+        self.driver.delete_all_cookies()
 
-    def generate_unique_email(self, prefix="selenium_us4"):
-        """Generate unique email addresses to ensure tests remain idempotent and isolate state."""
-        email = f"{prefix}_{uuid.uuid4().hex[:8]}@campuseats.edu"
-        self.created_user_emails.append(email)
+    # ---- helpers: everything goes through pages a real user would use ----
+
+    def new_student(self, name, driver=None):
+        """Register a brand-new student, log in, and return the account's email."""
+        driver = driver or self.driver
+        email = f"selenium_us4_{uuid.uuid4().hex[:10]}@campuseats.edu"
+        register(driver, name, email, PASSWORD, "student")
+        log_in(driver, email, PASSWORD)
         return email
 
-    def login_user(self, email, password):
-        """Log in an existing registered user via the browser."""
-        self.driver.get(f"{BASE_URL}/login")
-        self.driver.find_element(By.ID, "email").send_keys(email)
-        self.driver.find_element(By.ID, "password").send_keys(password)
-        login_btn = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Log In')]")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", login_btn
-        )
-        WebDriverWait(self.driver, 5).until(lambda d: d.current_url != f"{BASE_URL}/login")
+    def post_listing(self, label, portions):
+        """Post a listing as the run's vendor through the new-listing form; return its title."""
+        title = f"{label} {uuid.uuid4().hex[:6]}"
+        driver = self.driver
+        log_out(driver)
+        log_in(driver, self.vendor_email, PASSWORD)
 
-    def register_and_login(self, name, email, password, role):
-        """Perform end-to-end user registration and authentication via the browser."""
-        self.driver.get(f"{BASE_URL}/register")
-        self.driver.find_element(By.ID, "name").send_keys(name)
-        self.driver.find_element(By.ID, "email").send_keys(email)
-        self.driver.find_element(By.ID, "password").send_keys(password)
-        Select(self.driver.find_element(By.ID, "role")).select_by_value(role)
-        reg_btn = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Create Account')]")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", reg_btn
-        )
+        driver.get(f"{BASE_URL}/listings/new")
+        driver.find_element(By.ID, "title").send_keys(title)
+        driver.find_element(By.ID, "portions").send_keys(str(portions))
+        driver.find_element(By.ID, "pickup_location").send_keys(PICKUP_LOCATION)
 
-        WebDriverWait(self.driver, 5).until(EC.url_contains("/login"))
-        self.login_user(email, password)
-
-    def logout_current_user(self):
-        """Log out the current authenticated user via the navigation bar."""
-        self.driver.get(f"{BASE_URL}/")
-        logout_btn = WebDriverWait(self.driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Logout')]"))
-        )
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", logout_btn
-        )
-        WebDriverWait(self.driver, 5).until(EC.url_contains("/login"))
-
-    def post_listing_as_vendor(self, title, portions=5):
-        """Post a new surplus food listing as an authenticated vendor."""
-        self.created_listing_titles.append(title)
-        vendor_email = self.generate_unique_email("vendor")
-        self.register_and_login("Campus Bakery", vendor_email, "VendorPass123!", "vendor")
-
-        self.driver.get(f"{BASE_URL}/listings/new")
-        self.driver.find_element(By.ID, "title").send_keys(title)
-        self.driver.find_element(By.ID, "portions").send_keys(str(portions))
-        self.driver.find_element(By.ID, "pickup_location").send_keys("Student Union Room 101")
-
-        start_dt = (datetime.now() + timedelta(days=1, hours=1)).strftime("%Y-%m-%dT%H:%M")
-        end_dt = (datetime.now() + timedelta(days=1, hours=3)).strftime("%Y-%m-%dT%H:%M")
-
-        start_input = self.driver.find_element(By.ID, "pickup_start")
-        end_input = self.driver.find_element(By.ID, "pickup_end")
-        self.driver.execute_script("arguments[0].value = arguments[1];", start_input, start_dt)
-        self.driver.execute_script("arguments[0].value = arguments[1];", end_input, end_dt)
-        submit_btn = self.driver.find_element(
-            By.XPATH, "//button[contains(text(), 'Post Listing')]"
-        )
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", submit_btn
-        )
-
-        WebDriverWait(self.driver, 5).until(EC.url_contains("/vendor/listings"))
-        self.logout_current_user()
-
-    def test_us4_ac1_reserve_portions_and_view_pickup_code(self):
-        """AC 1: Reserving portions decrements inventory and displays unique 6-character pickup code."""
-        unique_title = f"Fresh Sandwiches {uuid.uuid4().hex[:6]}"
-        self.post_listing_as_vendor(unique_title, portions=4)
-
-        student_email = self.generate_unique_email("student")
-        self.register_and_login("Alex Student", student_email, "StudentPass123!", "student")
-
-        self.driver.get(f"{BASE_URL}/listings")
-        card = WebDriverWait(self.driver, 5).until(
-            EC.presence_of_element_located(
-                (
-                    By.XPATH,
-                    f"//div[contains(@class, 'listing-card') and .//h5[contains(text(), '{unique_title}')]]",
-                )
+        # Tomorrow, so the window is still open whatever time zone the server runs in
+        start = datetime.now() + timedelta(days=1)
+        end = start + timedelta(hours=2)
+        for field_id, value in (("pickup_start", start), ("pickup_end", end)):
+            driver.execute_script(
+                "arguments[0].value = arguments[1];",
+                driver.find_element(By.ID, field_id),
+                value.strftime("%Y-%m-%dT%H:%M"),
             )
-        )
-        self.assertIn("4 left", card.text)
+        click(driver, driver.find_element(By.XPATH, "//button[contains(., 'Post Listing')]"))
+        wait_for(driver, EC.url_contains("/vendor/listings"), "listing was not posted")
 
-        portion_select = card.find_element(By.CSS_SELECTOR, "select[name='portions']")
-        Select(portion_select).select_by_value("1")
-        reserve_btn = card.find_element(By.CSS_SELECTOR, "button.reserve-submit-btn")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", reserve_btn
-        )
+        type(self).listing_titles.append(title)
+        log_out(driver)
+        return title
 
-        alert = WebDriverWait(self.driver, 5).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-success"))
-        )
-        self.assertIn("Reservation confirmed!", alert.text)
-
-        modal = WebDriverWait(self.driver, 5).until(
-            EC.visibility_of_element_located((By.ID, "pickupCodeModal"))
-        )
-        self.assertTrue(modal.is_displayed())
-
-        code_elem = self.driver.find_element(By.ID, "pickup-code-val")
-        code_text = code_elem.text.strip()
-        self.assertTrue(
-            bool(re.match(r"^[A-Z0-9]{6}$", code_text)), f"Invalid code format: {code_text}"
+    def listing_card(self, title, driver=None):
+        driver = driver or self.driver
+        driver.get(f"{BASE_URL}/listings")
+        return wait_for(
+            driver,
+            EC.presence_of_element_located((By.XPATH, card_xpath(title))),
+            f"listing '{title}' is not in the student feed",
         )
 
-        self.assertIn("Student Union Room 101", modal.text)
-        copy_button = modal.find_element(By.ID, "copy-pickup-code-btn")
-        self.assertTrue(copy_button.is_displayed())
+    def portions_left(self, title, driver=None):
+        """Remaining portions shown on the listing's card in the student feed."""
+        badge = self.listing_card(title, driver).find_element(By.CSS_SELECTOR, ".portions-badge")
+        return int(badge.text.split()[0])
 
-        done_btn = modal.find_element(By.XPATH, "//button[contains(text(), 'Done')]")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", done_btn
+    def submit_reservation(self, title, portions, driver=None):
+        """Choose a number of portions on the listing's card and click Reserve."""
+        driver = driver or self.driver
+        card = self.listing_card(title, driver)
+        Select(card.find_element(By.CSS_SELECTOR, "select[name='portions']")).select_by_value(
+            str(portions)
         )
-        updated_card = self.driver.find_element(
-            By.XPATH,
-            f"//div[contains(@class, 'listing-card') and .//h5[contains(text(), '{unique_title}')]]",
-        )
-        self.assertIn("3 left", updated_card.text)
+        click(driver, card.find_element(By.CSS_SELECTOR, "button.reserve-submit-btn"))
 
-    def test_us4_ac2_request_more_portions_than_remain_rejected(self):
-        """AC 2: Requesting more portions than remaining is rejected with a clear error."""
-        unique_title = f"Last Bagel {uuid.uuid4().hex[:6]}"
-        self.post_listing_as_vendor(unique_title, portions=1)
-
-        student_email = self.generate_unique_email("student")
-        self.register_and_login("Blake Student", student_email, "StudentPass123!", "student")
-
-        self.driver.get(f"{BASE_URL}/listings")
-        card = WebDriverWait(self.driver, 5).until(
-            EC.presence_of_element_located(
-                (
-                    By.XPATH,
-                    f"//div[contains(@class, 'listing-card') and .//h5[contains(text(), '{unique_title}')]]",
-                )
-            )
+    def pickup_code_from_modal(self, driver=None):
+        """Read the pickup code from the confirmation modal, then close the modal."""
+        driver = driver or self.driver
+        modal = wait_for(
+            driver,
+            EC.visibility_of_element_located((By.ID, "pickupCodeModal")),
+            "the pickup code modal did not appear",
         )
-        self.assertIn("1 left", card.text)
+        code = driver.find_element(By.ID, "pickup-code-val").text.strip()
+        modal_text = modal.text
+        click(driver, modal.find_element(By.XPATH, ".//button[normalize-space()='Done']"))
+        return code, modal_text
 
-        portion_select = card.find_element(By.CSS_SELECTOR, "select[name='portions']")
-        Select(portion_select).select_by_value("2")
-        reserve_btn = card.find_element(By.CSS_SELECTOR, "button.reserve-submit-btn")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", reserve_btn
+    def error_message(self, driver=None):
+        driver = driver or self.driver
+        alert = wait_for(
+            driver,
+            EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-danger")),
+            "no error message was shown",
         )
+        return alert.text
 
-        alert = WebDriverWait(self.driver, 5).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-danger"))
-        )
-        self.assertIn("Not enough portions remaining to fulfill your request.", alert.text)
+    def my_reservations(self, title, driver=None):
+        """This student's reservations for a listing, read from the My Reservations page.
 
-        updated_card = self.driver.find_element(
-            By.XPATH,
-            f"//div[contains(@class, 'listing-card') and .//h5[contains(text(), '{unique_title}')]]",
-        )
-        self.assertIn("1 left", updated_card.text)
+        Returns one (portions, pickup_code, status) tuple per row.
+        """
+        driver = driver or self.driver
+        driver.get(f"{BASE_URL}/student/reservations")
+        wait_for(driver, EC.presence_of_element_located((By.TAG_NAME, "h1")))
+        rows = driver.find_elements(By.XPATH, f"//tbody/tr[td[1][normalize-space()='{title}']]")
+        reservations = []
+        for row in rows:
+            # Columns: listing, vendor, location, window, portions, pickup code, status, action
+            cells = [cell.text.strip() for cell in row.find_elements(By.TAG_NAME, "td")]
+            reservations.append((cells[4], cells[5], cells[6]))
+        return reservations
 
-    def test_us4_ac3_duplicate_active_reservation_rejected(self):
-        """AC 3: A student cannot reserve twice on the same listing with an active reservation."""
-        unique_title = f"Pasta Trays {uuid.uuid4().hex[:6]}"
-        self.post_listing_as_vendor(unique_title, portions=10)
+    def vendor_counts(self, title):
+        """(total, reserved, remaining) for a listing on the vendor's My Listings page."""
+        driver = self.driver
+        log_out(driver)
+        log_in(driver, self.vendor_email, PASSWORD)
+        driver.get(f"{BASE_URL}/vendor/listings")
+        row = wait_for(
+            driver,
+            EC.presence_of_element_located((By.XPATH, f"//tr[.//a[normalize-space()='{title}']]")),
+            f"listing '{title}' is not on the vendor's My Listings page",
+        )
+        counts = tuple(
+            int(row.find_element(By.CSS_SELECTOR, f"td.portions-{name}").text)
+            for name in ("total", "reserved", "remaining")
+        )
+        log_out(driver)
+        return counts
 
-        student_email = self.generate_unique_email("student")
-        self.register_and_login("Casey Student", student_email, "StudentPass123!", "student")
+    # ---- acceptance criteria ----
 
-        self.driver.get(f"{BASE_URL}/listings")
-        card = WebDriverWait(self.driver, 5).until(
-            EC.presence_of_element_located(
-                (
-                    By.XPATH,
-                    f"//div[contains(@class, 'listing-card') and .//h5[contains(text(), '{unique_title}')]]",
-                )
-            )
-        )
+    def test_us4_ac1_reserve_one_or_two_portions_and_get_unique_pickup_code(self):
+        """AC 1: a reservation is stored, remaining portions drop by the amount reserved,
+        and the student sees a unique 6-character pickup code."""
+        title = self.post_listing("Fresh Sandwiches", portions=5)
 
-        Select(card.find_element(By.CSS_SELECTOR, "select[name='portions']")).select_by_value("1")
-        reserve_btn = card.find_element(By.CSS_SELECTOR, "button.reserve-submit-btn")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", reserve_btn
-        )
+        # First student reserves 2 portions
+        self.new_student("Alex Student")
+        self.assertEqual(self.portions_left(title), 5)
+        self.submit_reservation(title, portions=2)
+        first_code, modal_text = self.pickup_code_from_modal()
 
-        WebDriverWait(self.driver, 5).until(
-            EC.visibility_of_element_located((By.ID, "pickupCodeModal"))
-        )
-        done_btn = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Done')]")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", done_btn
-        )
+        self.assertRegex(first_code, r"^[A-Z0-9]{6}$")
+        self.assertIn("2 portions", modal_text)
+        self.assertIn(PICKUP_LOCATION, modal_text)
+        self.assertEqual(self.portions_left(title), 3, "remaining must drop by the 2 reserved")
 
-        card_again = self.driver.find_element(
-            By.XPATH,
-            f"//div[contains(@class, 'listing-card') and .//h5[contains(text(), '{unique_title}')]]",
-        )
-        Select(card_again.find_element(By.CSS_SELECTOR, "select[name='portions']")).select_by_value(
-            "1"
-        )
-        reserve_btn2 = card_again.find_element(By.CSS_SELECTOR, "button.reserve-submit-btn")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", reserve_btn2
-        )
+        # The reservation is stored: it is listed on My Reservations with the same code
+        self.assertEqual(self.my_reservations(title), [("2", first_code, "active")])
 
-        alert = WebDriverWait(self.driver, 5).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-danger"))
-        )
-        self.assertIn("You already have an active reservation for this listing.", alert.text)
+        # Second student reserves 1 portion from the same listing
+        log_out(self.driver)
+        self.new_student("Blake Student")
+        self.submit_reservation(title, portions=1)
+        second_code, modal_text = self.pickup_code_from_modal()
 
-    def test_us4_ac4_last_portion_exhaustion_prevents_overbooking(self):
-        """AC 4: When the last portion is claimed, concurrent student attempts are rejected."""
-        unique_title = f"Last Muffin {uuid.uuid4().hex[:6]}"
-        self.post_listing_as_vendor(unique_title, portions=1)
+        self.assertRegex(second_code, r"^[A-Z0-9]{6}$")
+        self.assertIn("1 portion", modal_text)
+        self.assertNotEqual(first_code, second_code, "each reservation needs its own code")
+        self.assertEqual(self.portions_left(title), 2, "remaining must drop by the 1 reserved")
 
-        student_two_email = self.generate_unique_email("student2")
-        self.register_and_login("Student Two", student_two_email, "StudentPass123!", "student")
-        self.driver.get(f"{BASE_URL}/listings")
-        card2 = WebDriverWait(self.driver, 5).until(
-            EC.presence_of_element_located(
-                (
-                    By.XPATH,
-                    f"//div[contains(@class, 'listing-card') and .//h5[contains(text(), '{unique_title}')]]",
-                )
-            )
-        )
-        reserve_action_url = card2.find_element(By.CSS_SELECTOR, "form.reserve-form").get_attribute(
-            "action"
-        )
-        self.logout_current_user()
+        # The vendor sees the same inventory
+        self.assertEqual(self.vendor_counts(title), (5, 3, 2))
 
-        student_one_email = self.generate_unique_email("student1")
-        self.register_and_login("Student One", student_one_email, "StudentPass123!", "student")
-        self.driver.get(f"{BASE_URL}/listings")
-        card1 = WebDriverWait(self.driver, 5).until(
-            EC.presence_of_element_located(
-                (
-                    By.XPATH,
-                    f"//div[contains(@class, 'listing-card') and .//h5[contains(text(), '{unique_title}')]]",
-                )
-            )
-        )
-        Select(card1.find_element(By.CSS_SELECTOR, "select[name='portions']")).select_by_value("1")
-        reserve_btn = card1.find_element(By.CSS_SELECTOR, "button.reserve-submit-btn")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView(true); arguments[0].click();", reserve_btn
-        )
+    def test_us4_ac2_requesting_more_portions_than_remain_is_rejected(self):
+        """AC 2: no reservation is created and an error is shown."""
+        title = self.post_listing("Last Bagel", portions=1)
 
-        WebDriverWait(self.driver, 5).until(
-            EC.visibility_of_element_located((By.ID, "pickupCodeModal"))
-        )
-        self.logout_current_user()
+        self.new_student("Casey Student")
+        self.assertEqual(self.portions_left(title), 1)
+        self.submit_reservation(title, portions=2)
 
-        self.login_user(student_two_email, "StudentPass123!")
-        self.driver.execute_script(
-            """
-            var form = document.createElement('form');
-            form.method = 'POST';
-            form.action = arguments[0];
-            var input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'portions';
-            input.value = '1';
-            form.appendChild(input);
-            document.body.appendChild(form);
-            form.submit();
-            """,
-            reserve_action_url,
-        )
+        self.assertIn("Not enough portions remaining", self.error_message())
+        self.assertFalse(self.driver.find_elements(By.ID, "pickupCodeModal"))
+        self.assertEqual(self.portions_left(title), 1, "a rejected request must not use portions")
+        self.assertEqual(self.my_reservations(title), [], "no reservation may be created")
+        self.assertEqual(self.vendor_counts(title), (1, 0, 1))
 
-        # Student Two is rejected because the final portion was already claimed
-        alert = WebDriverWait(self.driver, 5).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-danger"))
-        )
-        self.assertIn("Not enough portions remaining to fulfill your request.", alert.text)
+    def test_us4_ac3_second_reservation_on_same_listing_is_rejected(self):
+        """AC 3: a student who already holds an active reservation is told so."""
+        title = self.post_listing("Pasta Trays", portions=5)
 
-        # Exhausted listing is no longer present in available feed
-        feed_text = self.driver.find_element(By.TAG_NAME, "body").text
-        self.assertNotIn(unique_title, feed_text)
+        self.new_student("Devon Student")
+        self.submit_reservation(title, portions=1)
+        code, _ = self.pickup_code_from_modal()
+
+        self.submit_reservation(title, portions=1)
+        self.assertIn(
+            "You already have an active reservation for this listing.", self.error_message()
+        )
+        self.assertEqual(self.portions_left(title), 4, "the second attempt must not use portions")
+
+        self.assertEqual(
+            self.my_reservations(title),
+            [("1", code, "active")],
+            "there must still be exactly one reservation",
+        )
+        self.assertEqual(self.vendor_counts(title), (5, 1, 4))
+
+    def test_us4_ac4_two_students_reserving_the_last_portion_at_the_same_moment(self):
+        """AC 4: only one reservation succeeds and remaining portions never go below zero.
+
+        Two separate browsers, each logged in as a different student, have the listing open
+        with one portion left. Both click Reserve at the same instant. It is repeated a few
+        times because which request reaches the server first is up to chance.
+        """
+        browsers = [start_chrome(), start_chrome()]
+        type(self).extra_drivers.extend(browsers)
+        for number, browser in enumerate(browsers, start=1):
+            self.new_student(f"Simultaneous Student {number}", driver=browser)
+
+        for round_number in range(1, SIMULTANEOUS_ROUNDS + 1):
+            with self.subTest(round=round_number):
+                title = self.post_listing("Last Muffin", portions=1)
+
+                # Both students load the page while the portion is still available
+                buttons = []
+                for browser in browsers:
+                    card = self.listing_card(title, driver=browser)
+                    self.assertIn("1 left", card.text)
+                    Select(
+                        card.find_element(By.CSS_SELECTOR, "select[name='portions']")
+                    ).select_by_value("1")
+                    button = card.find_element(By.CSS_SELECTOR, "button.reserve-submit-btn")
+                    browser.execute_script(
+                        "arguments[0].scrollIntoView({block: 'center'});", button
+                    )
+                    buttons.append(button)
+
+                # Release both clicks together
+                start_together = threading.Barrier(len(browsers))
+                errors = []
+
+                def reserve_now(button):
+                    try:
+                        start_together.wait(timeout=30)
+                        button.click()
+                    except Exception as exc:  # reported after the threads finish
+                        errors.append(exc)
+
+                threads = [threading.Thread(target=reserve_now, args=(b,)) for b in buttons]
+                for thread in threads:
+                    thread.start()
+                for thread in threads:
+                    thread.join(timeout=60)
+                self.assertEqual(errors, [])
+
+                # Exactly one student got a pickup code; the other got the error
+                outcomes = []
+                for browser in browsers:
+                    wait_for(
+                        browser,
+                        EC.presence_of_element_located(
+                            (By.CSS_SELECTOR, ".alert-success, .alert-danger")
+                        ),
+                        "a student saw neither a confirmation nor an error",
+                    )
+                    confirmed = browser.find_elements(By.ID, "pickupCodeModal")
+                    if confirmed:
+                        code, _ = self.pickup_code_from_modal(driver=browser)
+                        self.assertRegex(code, r"^[A-Z0-9]{6}$")
+                        outcomes.append("reserved")
+                    else:
+                        self.assertIn(
+                            "Not enough portions remaining", self.error_message(driver=browser)
+                        )
+                        outcomes.append("rejected")
+                self.assertEqual(sorted(outcomes), ["rejected", "reserved"])
+
+                # One stored reservation in total, and it belongs to the winner
+                for browser, outcome in zip(browsers, outcomes):
+                    expected_rows = 1 if outcome == "reserved" else 0
+                    self.assertEqual(
+                        len(self.my_reservations(title, driver=browser)), expected_rows
+                    )
+
+                # Inventory is exactly zero, never negative
+                self.assertEqual(self.vendor_counts(title), (1, 1, 0))
+
+
+if __name__ == "__main__":
+    unittest.main()
