@@ -23,7 +23,9 @@ def seed_database():
             ).scalar_one_or_none()
             if vendor:
                 stale_listings = (
-                    db.session.execute(db.select(Listing).filter_by(vendor_id=vendor.id))
+                    db.session.execute(
+                        db.select(Listing).filter_by(vendor_id=vendor.id, status="active")
+                    )
                     .scalars()
                     .all()
                 )
@@ -37,8 +39,6 @@ def seed_database():
                     start_off, end_off = offsets[idx % len(offsets)]
                     listing.pickup_start = now - start_off
                     listing.pickup_end = now + end_off
-                    listing.status = "active"
-                    listing.remaining_portions = max(listing.remaining_portions, 5)
                 db.session.commit()
         return
 

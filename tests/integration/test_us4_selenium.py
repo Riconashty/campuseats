@@ -87,7 +87,6 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
                     or "127.0.0.1" in db_url
                     or ":memory:" in db_url
                     or "campuseats_test" in db_url
-                    or "campuseats" in db_url
                 )
                 if not is_safe_env:
                     print(
