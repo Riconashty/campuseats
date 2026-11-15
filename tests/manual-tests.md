@@ -20,38 +20,42 @@ they are re-tested after a fix.
 
 | User story | Acceptance criterion | Tester | Date | Result | Notes |
 | --- | --- | --- | --- | --- | --- |
-| US1 | 1: registering stores the account and redirects to the login page | | | | |
-| US1 | 2: duplicate email rejected | | | | |
-| US1 | 3: empty required field is identified and no account is created | | | | |
-| US1 | 4: password is stored hashed, not in plain text | | | | |
-| US1 | 5: correct login lands on the role's home page; wrong password shows an error and stays logged out | | | | |
-| US2 | 1: vendor posts a listing and it is stored under their account | | | | |
-| US2 | 2: pickup end before start, or end in the past, is rejected | | | | |
-| US2 | 3: student is denied access to the new-listing page | | | | |
-| US3 | 1: feed shows every listing that has not ended, has a portion left, and is not cancelled | | | | |
-| US3 | 2: each listing shows title, vendor name, location, dietary tags, portions remaining, and pickup window | | | | |
-| US3 | 3: listings are sorted by pickup window end, soonest first | | | | |
-| US3 | 4: a message is shown when no listings are available | | | | |
-| US5 | 1: My Listings shows every listing with its status and portions reserved and remaining | | | | |
-| US5 | 2: editing a listing with no reservations saves the changes, with the US2 rules applied | | | | |
-| US5 | 3: portions cannot be set below the number already reserved | | | | |
-| US5 | 4: cancelling a listing hides it from students and cancels its active reservations | | | | |
-| US5 | 5: listing detail shows each student's name and portions; other vendors' listings cannot be seen or changed | | | | |
-| US6 | 1: My Reservations shows title, vendor, location, pickup window, portions, pickup code, and status | | | | |
-| US6 | 2: cancelling an active reservation marks it cancelled and returns its portions | | | | |
-| US6 | 3: no Cancel option for a reservation that is not active | | | | |
-| US7 | 1: a valid code during the pickup window marks the reservation picked up and shows the student name and portions | | | | |
-| US7 | 2: a code that does not exist, belongs to another vendor, or was already used or cancelled is rejected with a clear message | | | | |
-| US7 | 3: after the pickup window ends, reservations still active are shown as no-show | | | | |
-| US8 | 1: selecting dietary tags shows only listings that have all selected tags | | | | |
-| US8 | 2: selecting a location shows only listings there, and combines with dietary tags | | | | |
-| US8 | 3: Clear filters shows all available listings again | | | | |
-| US9 | 1: dashboard shows listings posted, portions posted, portions picked up, and no-show count for a date range | | | | |
-| US9 | 2: no-show rate is shown as a percentage of reserved portions | | | | |
-| US9 | 3: a range with no data shows 0 everywhere and no error | | | | |
-| US10 | 1: a picked-up reservation can be rated 1 to 5 stars with an optional comment of up to 300 characters | | | | |
-| US10 | 2: each picked-up reservation can be rated only once; other statuses cannot be rated | | | | |
-| US10 | 3: vendor sees the average rating and the comments for each listing | | | | |
+| US1 | 1: registering stores the account and redirects to the login page |Richard Hall | 2026-10-29 | verified | |
+| US1 | 2: duplicate email rejected |Richard Hall |2026-10-29 |verified | |
+| US1 | 3: empty required field is identified and no account is created |Richard Hall | 2026-10-29 | verified | |
+| US1 | 4: password is stored hashed, not in plain text |Richard Hall | 2026-10-29 | verified | |
+| US1 | 5: correct login lands on the role's home page; wrong password shows an error and stays logged out |Richard Hall | 2026-10-29 | verified | |
+| US2 | 1: vendor posts a listing and it is stored under their account |Stephanie Rivera-Martinez |2026-11-01  |verified | |
+| US2 | 2: pickup end before start, or end in the past, is rejected |Stephanie Rivera-Martinez |2026-11-01  |verified | |
+| US2 | 3: student is denied access to the new-listing page |Stephanie Rivera-Martinez |2026-11-01  |verified | |
+| US3 | 1: feed shows every listing that has not ended, has a portion left, and is not cancelled |Tyler Black |2026-11-03 |Verified | |
+| US3 | 2: each listing shows title, vendor name, location, dietary tags, portions remaining, and pickup window |Tyler Black |2026-11-03 |Verified | |
+| US3 | 3: listings are sorted by pickup window end, soonest first |Tyler Black |2026-11-03 |Verified | |
+| US3 | 4: a message is shown when no listings are available |Tyler Black |2026-11-03 |Verified | |
+| US5 | 1: My Listings shows every listing with its status and portions reserved and remaining |Tyler Black |2026-11-12 |Verified | |
+| US5 | 2: editing a listing with no reservations saves the changes, with the US2 rules applied |Tyler Black |2026-11-12 |Verified | |
+| US5 | 3: portions cannot be set below the number already reserved |Tyler Black |2026-11-12 |Verified | |
+| US5 | 4: cancelling a listing hides it from students and cancels its active reservations |Tyler Black |2026-11-12 |Verified | |
+| US5 | 5: listing detail shows each student's name and portions; other vendors' listings cannot be seen or changed |Tyler Black |2026-11-12 |Verified | |
+| US6 | 1: My Reservations shows title, vendor, location, pickup window, portions, pickup code, and status |Tyler Black |2026-11-08 |Verified | |
+| US6 | 2: cancelling an active reservation marks it cancelled and returns its portions |Tyler Black |2026-11-08 |Verified | |
+| US6 | 3: no Cancel option for a reservation that is not active |Tyler Black |2026-11-08 |Verified | |
+| US7 | 1: a valid code during the pickup window marks the reservation picked up and shows the student name and portions |
+Cameron Greeson |2026-11-12 | verified| |
+| US7 | 2: a code that does not exist, belongs to another vendor, or was already used or cancelled is rejected with a clear message |
+Cameron Greeson |2026-11-12 | verified| |
+| US7 | 3: after the pickup window ends, reservations still active are shown as no-show |
+Cameron Greeson |2026-11-12 | verified| |
+| US8 | 1: selecting dietary tags shows only listings that have all selected tags |
+Cameron Greeson |2026-11-12 | verified| |
+| US8 | 2: selecting a location shows only listings there, and combines with dietary tags |Tyler Black|2026-11-14|verified| |
+| US8 | 3: Clear filters shows all available listings again |Tyler Black|2026-11-14|verified| |
+| US9 | 1: dashboard shows listings posted, portions posted, portions picked up, and no-show count for a date range |Tyler Black|2026-11-14|verified| |
+| US9 | 2: no-show rate is shown as a percentage of reserved portions |Tyler Black|2026-11-14|verified| |
+| US9 | 3: a range with no data shows 0 everywhere and no error |Tyler Black|2026-11-14|verified| |
+| US10 | 1: a picked-up reservation can be rated 1 to 5 stars with an optional comment of up to 300 characters |Richard Hall |2026-11-14|verified| |
+| US10 | 2: each picked-up reservation can be rated only once; other statuses cannot be rated |Richard Hall |2026-11-14|verified| |
+| US10 | 3: vendor sees the average rating and the comments for each listing |Richard Hall |2026-11-14|verified| |
 
 ## How to run each check
 
