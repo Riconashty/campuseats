@@ -1,9 +1,11 @@
+import os
+import time
 import unittest
 
 from campuseats import create_app
 from campuseats.config import TestingConfig
 from campuseats.extensions import db
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from campuseats.models.listing import Listing
 from campuseats.models.user import User
 from campuseats.models.reservation import Reservation
@@ -260,3 +262,160 @@ class ImpactDashboardTestCase(unittest.TestCase):
             b"Start date cannot be after end date.",
             invalid_response.data,
         )
+
+    def _register_vendor_with_student(self):
+        # Register and log in the vendor, then return (vendor_id, student_id)
+        self.client.post(
+            "/register",
+            data={
+                "name": "Test Vendor",
+                "email": "vendor@t.edu",
+                "password": "Password123!",
+                "role": "vendor",
+            },
+        )
+        self.client.post(
+            "/login",
+            data={"email": "vendor@t.edu", "password": "Password123!"},
+        )
+        with self.app.app_context():
+            vendor_id = db.session.execute(
+                db.select(User.id).filter_by(email="vendor@t.edu")
+            ).scalar_one()
+            student = User(
+                name="Test Student",
+                email="student@t.edu",
+                password_hash="test",
+                role="student",
+            )
+            db.session.add(student)
+            db.session.commit()
+            return vendor_id, student.id
+
+    def _card_value(self, response, heading):
+        # Read the number shown under one dashboard card heading
+        body = response.get_data(as_text=True)
+        after_heading = body.split(f"<h5>{heading}</h5>", 1)[1]
+        return after_heading.split('<p class="fs-3 fw-bold">', 1)[1].split("</p>", 1)[0]
+
+    def test_dashboard_counts_expired_active_reservations_as_no_shows(self):
+        # US9 AC1-2 with US7 AC3: a reservation nobody collected is a no-show as soon as
+        # the pickup window ends, even though the vendor never typed its pickup code
+        vendor_id, student_id = self._register_vendor_with_student()
+
+        with self.app.app_context():
+            ended = Listing(
+                vendor_id=vendor_id,
+                title="Ended Listing",
+                total_portions=10,
+                remaining_portions=5,
+                pickup_location="Student Union",
+                pickup_start=datetime.now() - timedelta(hours=3),
+                pickup_end=datetime.now() - timedelta(hours=1),
+                status="active",
+            )
+            still_open = Listing(
+                vendor_id=vendor_id,
+                title="Open Listing",
+                total_portions=10,
+                remaining_portions=9,
+                pickup_location="Student Union",
+                pickup_start=datetime.now() - timedelta(hours=1),
+                pickup_end=datetime.now() + timedelta(hours=2),
+                status="active",
+            )
+            db.session.add_all([ended, still_open])
+            db.session.flush()
+            db.session.add_all(
+                [
+                    # Never collected and never entered at the counter: a no-show
+                    Reservation(
+                        student_id=student_id,
+                        listing_id=ended.id,
+                        portions_reserved=2,
+                        pickup_code="US9C01",
+                        status="active",
+                    ),
+                    Reservation(
+                        student_id=student_id,
+                        listing_id=ended.id,
+                        portions_reserved=2,
+                        pickup_code="US9C02",
+                        status="picked up",
+                    ),
+                    # Cancelled before the window ended: not a no-show and not reserved
+                    Reservation(
+                        student_id=student_id,
+                        listing_id=ended.id,
+                        portions_reserved=1,
+                        pickup_code="US9C03",
+                        status="cancelled",
+                    ),
+                    # Still inside its pickup window: reserved, but not a no-show yet
+                    Reservation(
+                        student_id=student_id,
+                        listing_id=still_open.id,
+                        portions_reserved=1,
+                        pickup_code="US9C04",
+                        status="active",
+                    ),
+                ]
+            )
+            db.session.commit()
+
+        response = self.client.get("/vendor/dashboard")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._card_value(response, "Portions Picked Up"), "2")
+        self.assertEqual(self._card_value(response, "No-Show Reservations"), "1")
+        # 2 no-show portions out of 5 reserved (2 no-show + 2 picked up + 1 still active)
+        self.assertEqual(self._card_value(response, "No-Show Rate"), "40.0%")
+
+    @unittest.skipUnless(hasattr(time, "tzset"), "needs time.tzset (not available on Windows)")
+    def test_date_range_follows_the_local_calendar_day(self):
+        # A listing posted at 6:30 PM in Denver is already "tomorrow" in UTC. The vendor
+        # picks dates from a calendar, so the range has to mean local days.
+        original_tz = os.environ.get("TZ")
+
+        def restore_timezone():
+            if original_tz is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = original_tz
+            time.tzset()
+
+        os.environ["TZ"] = "America/Denver"
+        time.tzset()
+        self.addCleanup(restore_timezone)
+
+        vendor_id, _ = self._register_vendor_with_student()
+        with self.app.app_context():
+            listing = Listing(
+                vendor_id=vendor_id,
+                title="Evening Listing",
+                total_portions=4,
+                remaining_portions=4,
+                pickup_location="Student Union",
+                pickup_start=datetime.now(),
+                pickup_end=datetime.now() + timedelta(hours=2),
+                status="active",
+            )
+            # 6:30 PM local time on Nov 15 is 1:30 AM UTC on Nov 16
+            listing.created_at = datetime(2026, 11, 15, 18, 30).astimezone(timezone.utc)
+            db.session.add(listing)
+            db.session.commit()
+
+        same_day = self.client.get("/vendor/dashboard?start_date=2026-11-15&end_date=2026-11-15")
+        self.assertEqual(self._card_value(same_day, "Total Listings Posted"), "1")
+        self.assertEqual(self._card_value(same_day, "Total Portions Posted"), "4")
+
+        next_day = self.client.get("/vendor/dashboard?start_date=2026-11-16&end_date=2026-11-16")
+        self.assertEqual(self._card_value(next_day, "Total Listings Posted"), "0")
+
+    def test_date_at_the_edge_of_the_calendar_is_rejected_not_crashed(self):
+        self._register_vendor_with_student()
+        response = self.client.get(
+            "/vendor/dashboard?start_date=9999-12-31&end_date=9999-12-31",
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Please enter a valid date range.", response.data)

@@ -93,14 +93,21 @@ class Listing(db.Model):
     def reserved_portions(self):
         return self.total_portions - self.remaining_portions
 
+    def has_ended(self, now=None):
+        """True once the pickup window is over. The end instant itself counts as ended."""
+        end = self.pickup_end
+        if end is None:
+            return False
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        if now is None:
+            now = datetime.now(timezone.utc)
+        return end <= now
+
     @property
     def display_status(self):
-        end = self.pickup_end
-        if end is not None:
-            if end.tzinfo is None:
-                end = end.replace(tzinfo=timezone.utc)
-            if self.status == "active" and end <= datetime.now(timezone.utc):
-                return "ended"
+        if self.status == "active" and self.has_ended():
+            return "ended"
         return self.status
 
     @property

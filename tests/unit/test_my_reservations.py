@@ -117,6 +117,32 @@ class MyReservationsTest(unittest.TestCase):
         for rid in (expired, cancelled, picked_up, no_show):
             self.assertNotIn(self.cancel_url(rid).encode(), body)
 
+    def test_expired_active_reservation_is_shown_as_no_show(self):
+        # US7 AC3 / US6 AC1: the status changes when the window ends, with no code entered
+        rid, lid = self.make_reservation(self.alice_id, "AAAAAA", hours_until_end=-1)
+        self.login_as(self.alice_id)
+        body = self.client.get("/student/reservations").data
+        self.assertIn(b">no-show</span>", body)
+        self.assertNotIn(b">active</span>", body)
+        # Viewing the page reports the status; it does not need to rewrite the stored row
+        self.assertEqual(self.state(rid, lid), ("active", 2))
+
+    def test_unexpired_active_reservation_is_still_shown_as_active(self):
+        self.make_reservation(self.alice_id, "AAAAAA")
+        self.login_as(self.alice_id)
+        body = self.client.get("/student/reservations").data
+        self.assertIn(b">active</span>", body)
+        self.assertNotIn(b">no-show</span>", body)
+
+    def test_usable_reservations_are_listed_before_expired_ones(self):
+        self.make_reservation(self.alice_id, "AAAAAA", title="Expired Meal", hours_until_end=-1)
+        self.make_reservation(self.alice_id, "BBBBBB", title="Open Meal")
+        self.make_reservation(self.alice_id, "CCCCCC", title="Another Expired", hours_until_end=-2)
+        self.login_as(self.alice_id)
+        body = self.client.get("/student/reservations").data.decode()
+        self.assertLess(body.index("Open Meal"), body.index("Expired Meal"))
+        self.assertLess(body.index("Open Meal"), body.index("Another Expired"))
+
     # ---- cancelling ----
 
     def test_cancel_releases_portions(self):

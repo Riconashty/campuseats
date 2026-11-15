@@ -72,5 +72,18 @@ class Reservation(db.Model):
         cascade="all, delete-orphan",
     )
 
+    @property
+    def display_status(self):
+        """The status to show users (US7 AC3).
+
+        An active reservation becomes a no-show the moment its listing's pickup window ends,
+        whether or not the vendor ever enters its code. Deriving it here, the same way
+        Listing.display_status derives "ended", keeps every page in agreement without a
+        background job.
+        """
+        if self.status == "active" and self.listing is not None and self.listing.has_ended():
+            return "no-show"
+        return self.status
+
     def __repr__(self):
         return f"<Reservation {self.id} {self.pickup_code} ({self.status})>"

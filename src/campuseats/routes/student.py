@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user
-from sqlalchemy import case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
@@ -180,19 +179,16 @@ def my_reservations():
                 selectinload(Reservation.rating),
             )
             .filter_by(student_id=current_user.id)
-            .order_by(
-                case((Reservation.status == "active", 0), else_=1),
-                Reservation.created_at.desc(),
-            )
+            .order_by(Reservation.created_at.desc())
         )
         .scalars()
         .all()
     )
-    return render_template(
-        "student/my_reservations.html",
-        reservations=reservations,
-        now=datetime.now(timezone.utc),
-    )
+    # Reservations that can still be used come first. An active reservation whose pickup
+    # window has ended is shown as a no-show (Reservation.display_status), so it sorts with
+    # the finished ones. sorted() is stable, so each group stays newest first.
+    reservations = sorted(reservations, key=lambda r: r.display_status != "active")
+    return render_template("student/my_reservations.html", reservations=reservations)
 
 
 @student_bp.route("/student/reservations/<int:reservation_id>/rate", methods=["GET", "POST"])
@@ -291,17 +287,26 @@ def cancel_reservation(reservation_id):
     if reservation.student_id != current_user.id:
         abort(403)
 
-    # Lock order is always listing first, the same as reserve_listing() and cancel_listing().
-    # The reservation row is locked later, by the UPDATE that commit() sends.
+    # Lock order is always listing first, then reservation: the same order reserve_listing(),
+    # cancel_listing() and confirm_pickup() use. Whichever request gets the listing lock
+    # finishes first, and the other one then sees its committed result.
     listing = db.session.execute(
-        db.select(Listing).filter_by(id=reservation.listing_id).with_for_update()
+        db.select(Listing)
+        .filter_by(id=reservation.listing_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).scalar_one()
 
-    # Re-read the reservation now that the listing is locked: another request may have
-    # cancelled it while this one was waiting for the lock
-    db.session.refresh(reservation)
+    # Re-read the reservation under its own row lock: a pickup or a vendor cancel may have
+    # changed it while this request was waiting, and the copy read above would be stale
+    reservation = db.session.execute(
+        db.select(Reservation)
+        .filter_by(id=reservation_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one()
 
-    if reservation.status != "active" or listing.pickup_end <= datetime.now(timezone.utc):
+    if reservation.status != "active" or listing.has_ended():
         db.session.rollback()
         flash("This reservation can no longer be cancelled.", "danger")
         return redirect(url_for("student.my_reservations"))

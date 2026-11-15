@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy.orm import selectinload
@@ -293,7 +293,7 @@ def expire_passed_reservations_for_listing(listing, now=None):
     if now is None:
         now = datetime.now(timezone.utc)
 
-    if now > listing.pickup_end:
+    if listing.has_ended(now):
         active_reservations = [res for res in listing.reservations if res.status == "active"]
         for res in active_reservations:
             res.status = "no-show"
@@ -311,16 +311,11 @@ def confirm_pickup():
             flash("Pickup code must contain exactly 6 letters or numbers.", "danger")
             return redirect(url_for("vendor.confirm_pickup"))
 
-        # Find reservation by pickup code with eager loaded relationships
+        # Look the code up without a lock first: we need to know which listing it is on
         reservation = db.session.execute(
             db.select(Reservation)
-            .options(
-                selectinload(Reservation.listing),
-                selectinload(Reservation.student),
-            )
+            .options(selectinload(Reservation.listing))
             .filter_by(pickup_code=pickup_code)
-            # Lock the reservation row for update to prevent race conditions
-            .with_for_update(of=Reservation)
         ).scalar_one_or_none()
 
         # Check whether the pickup code exists and belongs to the logged-in vendor
@@ -329,7 +324,24 @@ def confirm_pickup():
             flash("Invalid code.", "danger")
             return redirect(url_for("vendor.confirm_pickup"))
 
-        # Verify the reservation is still active
+        # Lock order is always listing first, then reservation: the same order the student's
+        # cancel_reservation() uses. Without the shared listing lock, a cancel that had already
+        # read "active" could overwrite this pickup and put the portion back on the shelf.
+        listing = db.session.execute(
+            db.select(Listing)
+            .filter_by(id=reservation.listing_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).scalar_one()
+        reservation = db.session.execute(
+            db.select(Reservation)
+            .options(selectinload(Reservation.student))
+            .filter_by(id=reservation.id)
+            .with_for_update(of=Reservation)
+            .execution_options(populate_existing=True)
+        ).scalar_one()
+
+        # Verify the reservation is still active, now that nothing else can change it
         if reservation.status != "active":
             db.session.rollback()
             flash(
@@ -338,8 +350,13 @@ def confirm_pickup():
             )
             return redirect(url_for("vendor.confirm_pickup"))
 
+        # Never hand food out for a listing the vendor has cancelled
+        if listing.status != "active":
+            db.session.rollback()
+            flash("Cannot confirm pickup. This listing was cancelled.", "danger")
+            return redirect(url_for("vendor.confirm_pickup"))
+
         # Check the listing's pickup window
-        listing = reservation.listing
         now = datetime.now(timezone.utc)
 
         # Pickup window has not started yet
@@ -349,7 +366,7 @@ def confirm_pickup():
             return redirect(url_for("vendor.confirm_pickup"))
 
         # Pickup window has already ended
-        if now > listing.pickup_end:
+        if listing.has_ended(now):
             expire_passed_reservations_for_listing(listing, now=now)
             flash("The pickup window has ended. Reservation marked as no-show.", "danger")
             return redirect(url_for("vendor.confirm_pickup"))
@@ -365,6 +382,11 @@ def confirm_pickup():
         )
 
     return render_template("vendor/confirm_pickup.html")
+
+
+def _local_midnight_as_utc(day):
+    """The instant a calendar day starts in the app's local time zone, expressed in UTC."""
+    return datetime.combine(day, time.min).astimezone(timezone.utc)
 
 
 @vendor_bp.route("/vendor/dashboard", methods=["GET"])
@@ -397,46 +419,60 @@ def vendor_dashboard():
         flash("Start date cannot be after end date.", "danger")
         return redirect(url_for("vendor.vendor_dashboard"))
 
-    # Start with listings belonging to the current vendor
-    query = db.select(Listing).filter_by(vendor_id=current_user.id)
-
-    # Filter listings by the selected start date
-    if start_date:
-        query = query.where(db.func.date(Listing.created_at) >= start_date)
-
-    # Filter listings by the selected end date
-    if end_date:
-        query = query.where(db.func.date(Listing.created_at) <= end_date)
+    # Listings belonging to the current vendor, posted inside the selected range.
+    # The date inputs are calendar days in the app's local time zone, while created_at is
+    # stored as an instant, so compare against the local midnights that bound the range.
+    listing_filters = [Listing.vendor_id == current_user.id]
+    try:
+        if start_date:
+            listing_filters.append(Listing.created_at >= _local_midnight_as_utc(start_date))
+        if end_date:
+            day_after_end = end_date + timedelta(days=1)
+            listing_filters.append(Listing.created_at < _local_midnight_as_utc(day_after_end))
+    except (OverflowError, ValueError):
+        # A year at the very edge of what a date can hold (for example 9999-12-31)
+        flash("Please enter a valid date range.", "danger")
+        return redirect(url_for("vendor.vendor_dashboard"))
 
     # Calculate listing counts and portions using SQLAlchemy
     total_listings_posted, total_portions_posted = db.session.execute(
-        query.with_only_columns(
+        db.select(
             db.func.count(Listing.id),
             db.func.coalesce(db.func.sum(Listing.total_portions), 0),
-        )
+        ).where(*listing_filters)
     ).one()
 
-    # Calculate reservation totals using SQLAlchemy
-    reservation_totals = db.session.execute(
-        db.select(
-            Reservation.status,
-            db.func.count(Reservation.id),
-            db.func.coalesce(db.func.sum(Reservation.portions_reserved), 0),
-        )
-        .where(Reservation.listing_id.in_(query.with_only_columns(Listing.id)))
-        .group_by(Reservation.status)
-    ).all()
-
-    # Organize reservation counts and portions by status
-    reservation_counts = {status: count for status, count, portions in reservation_totals}
-    reservation_portions = {status: portions for status, count, portions in reservation_totals}
-
-    total_portions_picked_up = reservation_portions.get("picked up", 0)
-    total_no_show_portions = reservation_portions.get("no-show", 0)
-    total_no_show_reservations = reservation_counts.get("no-show", 0)
-    total_portions_reserved = sum(
-        portions for status, portions in reservation_portions.items() if status != "cancelled"
+    # A no-show is a reservation already stored as "no-show", or one that is still stored as
+    # "active" although its pickup window has ended (the rule in Reservation.display_status)
+    now = datetime.now(timezone.utc)
+    is_no_show = db.or_(
+        Reservation.status == "no-show",
+        db.and_(Reservation.status == "active", Listing.pickup_end <= now),
     )
+
+    def portions_where(condition):
+        return db.func.coalesce(
+            db.func.sum(db.case((condition, Reservation.portions_reserved), else_=0)), 0
+        )
+
+    # Calculate reservation totals for those listings in one query
+    (
+        total_portions_picked_up,
+        total_no_show_portions,
+        total_no_show_reservations,
+        total_portions_reserved,
+    ) = db.session.execute(
+        db.select(
+            portions_where(Reservation.status == "picked up"),
+            portions_where(is_no_show),
+            db.func.coalesce(db.func.sum(db.case((is_no_show, 1), else_=0)), 0),
+            # Cancelled reservations gave their portions back, so they are not "reserved"
+            portions_where(Reservation.status != "cancelled"),
+        )
+        .select_from(Reservation)
+        .join(Listing, Reservation.listing_id == Listing.id)
+        .where(*listing_filters)
+    ).one()
 
     # calculate the no-show rate as percentage
     if total_portions_reserved > 0:

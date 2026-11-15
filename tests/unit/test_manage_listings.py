@@ -163,6 +163,25 @@ class ManageListingsTestCase(unittest.TestCase):
         for text in ("Alice Adams", "alice@t.edu", "Bob Brown", "bob@t.edu"):
             self.assertIn(text, body)
 
+    def test_detail_shows_no_show_once_the_pickup_window_has_ended(self):
+        # US7 AC3: every reservation still active when the window ends is shown as no-show
+        lid = self.make_listing(hours_until_end=-1)
+        self.reserve(lid, self.alice_id, "AAAAAA", portions=2)
+        self.reserve(lid, self.bob_id, "BBBBBB", portions=1, status="picked up")
+        self.login_owner()
+        body = self.client.get(f"/vendor/listings/{lid}").data.decode()
+        self.assertIn(">No-show</span>", body)
+        self.assertIn(">Picked up</span>", body)
+        self.assertNotIn(">Active</span>", body)
+
+    def test_detail_shows_active_while_the_pickup_window_is_open(self):
+        lid = self.make_listing()
+        self.reserve(lid, self.alice_id, "AAAAAA")
+        self.login_owner()
+        body = self.client.get(f"/vendor/listings/{lid}").data.decode()
+        self.assertIn(">Active</span>", body)
+        self.assertNotIn(">No-show</span>", body)
+
     def test_detail_empty_state(self):
         lid = self.make_listing()
         self.login_owner()
