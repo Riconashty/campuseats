@@ -222,6 +222,20 @@ class ManageListingsTestCase(unittest.TestCase):
 
     # ---- AC4: portion reduction guard ----
 
+    def test_edit_rejects_text_longer_than_the_database_columns(self):
+        lid = self.make_listing()
+        self.login_owner()
+        for field, value, message in (
+            ("title", "T" * 201, b"Title must be 200 characters or fewer."),
+            ("pickup_location", "L" * 256, b"Pickup Location must be 255 characters or fewer."),
+        ):
+            response = self.client.post(
+                f"/vendor/listings/{lid}/edit", data=self.form(**{field: value})
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(message, response.data)
+        self.assertEqual(self.listing_state(lid)["title"], "Bagels")
+
     def test_cannot_reduce_portions_below_reserved(self):
         lid = self.make_listing(total=10)
         self.reserve(lid, self.alice_id, "AAAAAA", portions=2)

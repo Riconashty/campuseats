@@ -10,6 +10,11 @@ from campuseats.routes.role_guards import vendor_required
 
 vendor_bp = Blueprint("vendor", __name__)
 
+# Longest text the listings table accepts, read from the model so the form rules and the
+# database columns cannot drift apart. PostgreSQL rejects longer values with an error.
+MAX_TITLE_LENGTH = Listing.title.type.length
+MAX_LOCATION_LENGTH = Listing.pickup_location.type.length
+
 
 def _validate_listing_form(form):
     """
@@ -36,6 +41,12 @@ def _validate_listing_form(form):
         if not value:
             return None, f"Please complete all required fields. Missing: {field_name}."
 
+    if len(title) > MAX_TITLE_LENGTH:
+        return None, f"Title must be {MAX_TITLE_LENGTH} characters or fewer."
+
+    if len(pickup_location) > MAX_LOCATION_LENGTH:
+        return None, f"Pickup Location must be {MAX_LOCATION_LENGTH} characters or fewer."
+
     try:
         portions = int(portions_raw)
         if portions < 1 or portions > 100:
@@ -44,13 +55,11 @@ def _validate_listing_form(form):
         return None, "Portions must be an integer between 1 and 100."
 
     try:
-        pickup_start = datetime.fromisoformat(pickup_start_raw)
-        pickup_end = datetime.fromisoformat(pickup_end_raw)
-    except ValueError:
+        # OverflowError: a year so far out of range that it cannot be converted to UTC
+        pickup_start = datetime.fromisoformat(pickup_start_raw).astimezone(timezone.utc)
+        pickup_end = datetime.fromisoformat(pickup_end_raw).astimezone(timezone.utc)
+    except (ValueError, OverflowError):
         return None, "Please provide valid dates and times for the pickup window."
-
-    pickup_start = pickup_start.astimezone(timezone.utc)
-    pickup_end = pickup_end.astimezone(timezone.utc)
 
     now = datetime.now(timezone.utc)
     if pickup_end < now:
