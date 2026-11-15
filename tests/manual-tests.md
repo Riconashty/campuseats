@@ -40,14 +40,10 @@ they are re-tested after a fix.
 | US6 | 1: My Reservations shows title, vendor, location, pickup window, portions, pickup code, and status |Tyler Black |2026-11-08 |Verified | |
 | US6 | 2: cancelling an active reservation marks it cancelled and returns its portions |Tyler Black |2026-11-08 |Verified | |
 | US6 | 3: no Cancel option for a reservation that is not active |Tyler Black |2026-11-08 |Verified | |
-| US7 | 1: a valid code during the pickup window marks the reservation picked up and shows the student name and portions |
-Cameron Greeson |2026-11-12 | verified| |
-| US7 | 2: a code that does not exist, belongs to another vendor, or was already used or cancelled is rejected with a clear message |
-Cameron Greeson |2026-11-12 | verified| |
-| US7 | 3: after the pickup window ends, reservations still active are shown as no-show |
-Cameron Greeson |2026-11-12 | verified| |
-| US8 | 1: selecting dietary tags shows only listings that have all selected tags |
-Cameron Greeson |2026-11-12 | verified| |
+| US7 | 1: a valid code during the pickup window marks the reservation picked up and shows the student name and portions | Cameron Greeson |2026-11-12 | verified| |
+| US7 | 2: a code that does not exist, belongs to another vendor, or was already used or cancelled is rejected with a clear message | Cameron Greeson |2026-11-12 | verified| |
+| US7 | 3: after the pickup window ends, reservations still active are shown as no-show | Cameron Greeson |2026-11-12 | verified| |
+| US8 | 1: selecting dietary tags shows only listings that have all selected tags | Cameron Greeson |2026-11-12 | verified| |
 | US8 | 2: selecting a location shows only listings there, and combines with dietary tags |Tyler Black|2026-11-14|verified| |
 | US8 | 3: Clear filters shows all available listings again |Tyler Black|2026-11-14|verified| |
 | US9 | 1: dashboard shows listings posted, portions posted, portions picked up, and no-show count for a date range |Tyler Black|2026-11-14|verified| |
