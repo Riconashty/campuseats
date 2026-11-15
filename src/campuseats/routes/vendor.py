@@ -49,15 +49,8 @@ def _validate_listing_form(form):
     except ValueError:
         return None, "Please provide valid dates and times for the pickup window."
 
-    if pickup_start.tzinfo is None:
-        pickup_start = pickup_start.astimezone(timezone.utc)
-    else:
-        pickup_start = pickup_start.astimezone(timezone.utc)
-
-    if pickup_end.tzinfo is None:
-        pickup_end = pickup_end.astimezone(timezone.utc)
-    else:
-        pickup_end = pickup_end.astimezone(timezone.utc)
+    pickup_start = pickup_start.astimezone(timezone.utc)
+    pickup_end = pickup_end.astimezone(timezone.utc)
 
     now = datetime.now(timezone.utc)
     if pickup_end < now:
@@ -229,7 +222,7 @@ def cancel_listing(listing_id):
     for reservation in listing.reservations:
         if reservation.status == "active":
             reservation.status = "cancelled"
-            reservation.cancellation_reason = "Cancelled by vendor"
+            reservation.cancellation_reason = Reservation.CANCELLATION_REASON_VENDOR
             listing.remaining_portions += reservation.portions_reserved
 
     db.session.commit()

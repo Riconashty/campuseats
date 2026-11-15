@@ -262,7 +262,7 @@ class ManageListingsTestCase(unittest.TestCase):
             res_alice = db.session.execute(
                 db.select(Reservation).filter_by(pickup_code="AAAAAA")
             ).scalar_one()
-            self.assertEqual(res_alice.cancellation_reason, "Cancelled by vendor")
+            self.assertEqual(res_alice.cancellation_reason, Reservation.CANCELLATION_REASON_VENDOR)
 
     def test_cancelled_listing_disappears_from_student_feed(self):
         lid = self.make_listing(title="Soon Gone")

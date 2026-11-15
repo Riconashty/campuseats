@@ -86,6 +86,25 @@ class SeedDatabaseTestCase(unittest.TestCase):
             db.drop_all()
             db.engine.dispose()
 
+    def test_seed_database_refreshes_stale_listings_when_all_expired(self):
+        from datetime import datetime, timedelta, timezone
+
+        with self.app.app_context():
+            seed_database()
+            now = datetime.now(timezone.utc)
+            # Expire all listings
+            listings = db.session.execute(db.select(Listing)).scalars().all()
+            for item in listings:
+                item.pickup_end = now - timedelta(hours=1)
+            db.session.commit()
+
+            # Calling seed_database again should refresh pickup windows so feed is not empty
+            seed_database()
+            refreshed = db.session.execute(db.select(Listing)).scalars().all()
+            for item in refreshed:
+                self.assertGreater(item.pickup_end, now)
+                self.assertEqual(item.status, "active")
+
     def test_create_app_does_not_seed_by_default_in_testing(self):
         with self.app.app_context():
             users = db.session.execute(db.select(User)).scalars().all()

@@ -12,21 +12,21 @@ DEFAULT_DIETARY_TAGS = (
 
 
 class UTCDateTime(db.TypeDecorator):
-    """DateTime type that standardizes storage and retrieval using timezone-aware UTC timestamps."""
+    """DateTime type that standardizes storage in UTC and localizes for display."""
 
     impl = db.DateTime(timezone=True)
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
         if value is not None:
-            if value.tzinfo is None:
-                return value.astimezone(timezone.utc)
             return value.astimezone(timezone.utc)
         return value
 
     def process_result_value(self, value, dialect):
-        if value is not None and value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
+        if value is not None:
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            return value.astimezone()
         return value
 
 

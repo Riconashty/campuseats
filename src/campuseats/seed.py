@@ -8,9 +8,38 @@ from campuseats.models.user import User
 
 
 def seed_database():
+    now = datetime.now(timezone.utc)
+
     # Check if database already has user accounts populated
     existing_user = db.session.execute(db.select(User)).first()
     if existing_user is not None:
+        # Refresh expired seeded listings if no active listings exist so demo feed stays populated
+        active_listing = db.session.execute(
+            db.select(Listing).filter_by(status="active").filter(Listing.pickup_end > now)
+        ).first()
+        if active_listing is None:
+            vendor = db.session.execute(
+                db.select(User).filter_by(email="vendor@campuseats.edu")
+            ).scalar_one_or_none()
+            if vendor:
+                stale_listings = (
+                    db.session.execute(db.select(Listing).filter_by(vendor_id=vendor.id))
+                    .scalars()
+                    .all()
+                )
+                offsets = [
+                    (timedelta(minutes=30), timedelta(hours=3)),
+                    (timedelta(minutes=45), timedelta(hours=4)),
+                    (timedelta(minutes=15), timedelta(hours=2)),
+                    (timedelta(minutes=20), timedelta(hours=2, minutes=30)),
+                ]
+                for idx, listing in enumerate(stale_listings):
+                    start_off, end_off = offsets[idx % len(offsets)]
+                    listing.pickup_start = now - start_off
+                    listing.pickup_end = now + end_off
+                    listing.status = "active"
+                    listing.remaining_portions = max(listing.remaining_portions, 5)
+                db.session.commit()
         return
 
     # Seed baseline vendor and student accounts for grading and testing

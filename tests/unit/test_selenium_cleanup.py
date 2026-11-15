@@ -46,7 +46,13 @@ class SeleniumCleanupUnitTest(unittest.TestCase):
                 password_hash="x",
                 role="vendor",
             )
-            db.session.add_all([vendor, student, legit_vendor])
+            numbered_vendor = User(
+                name="Numbered Vendor",
+                email="vendor2@campuseats.edu",
+                password_hash="x",
+                role="vendor",
+            )
+            db.session.add_all([vendor, student, legit_vendor, numbered_vendor])
             db.session.commit()
 
             now = datetime.now(timezone.utc)
@@ -138,3 +144,10 @@ class SeleniumCleanupUnitTest(unittest.TestCase):
                 .first()
             )
             self.assertIsNotNone(remaining_legit_user)
+
+            remaining_numbered_user = (
+                db.session.execute(db.select(User).filter_by(email="vendor2@campuseats.edu"))
+                .scalars()
+                .first()
+            )
+            self.assertIsNotNone(remaining_numbered_user)

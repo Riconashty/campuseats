@@ -61,6 +61,7 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
 
     driver = None
     created_listing_titles = []
+    created_user_emails = []
 
     @classmethod
     def cleanup_test_database(cls, app=None):
@@ -78,6 +79,23 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
             from campuseats.models.user import User
 
             with app.app_context():
+                # Guard against running database cleanup against unintended environments
+                db_url = str(db.engine.url).lower()
+                is_safe_env = (
+                    app.config.get("TESTING", False)
+                    or "localhost" in db_url
+                    or "127.0.0.1" in db_url
+                    or ":memory:" in db_url
+                    or "campuseats_test" in db_url
+                    or "campuseats" in db_url
+                )
+                if not is_safe_env:
+                    print(
+                        f"Warning: Selenium DB cleanup skipped for safety (unrecognized target: {db_url})",
+                        file=sys.stderr,
+                    )
+                    return
+
                 # Sweep both tracked listing titles and orphaned test listings matching patterns
                 patterns = [
                     "Fresh Sandwiches %",
@@ -97,12 +115,18 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
                     db.session.delete(listing)
 
                 # Remove ephemeral test accounts created during selenium test executions
+                # Underscore is explicitly escaped so LIKE matches literal underscores rather than any single character
                 user_patterns = [
-                    "selenium_us4_%",
-                    "vendor_%@campuseats.edu",
-                    "student_%@campuseats.edu",
+                    r"selenium\_us4\_%",
+                    r"vendor\_%@campuseats.edu",
+                    r"student\_%@campuseats.edu",
+                    r"student1\_%@campuseats.edu",
+                    r"student2\_%@campuseats.edu",
                 ]
-                user_filters = [User.email.like(p) for p in user_patterns]
+                user_filters = [User.email.like(p, escape="\\") for p in user_patterns]
+                if cls.created_user_emails:
+                    user_filters.append(User.email.in_(cls.created_user_emails))
+
                 test_users = (
                     db.session.execute(db.select(User).filter(db.or_(*user_filters)))
                     .scalars()
@@ -160,7 +184,9 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
 
     def generate_unique_email(self, prefix="selenium_us4"):
         """Generate unique email addresses to ensure tests remain idempotent and isolate state."""
-        return f"{prefix}_{uuid.uuid4().hex[:8]}@campuseats.edu"
+        email = f"{prefix}_{uuid.uuid4().hex[:8]}@campuseats.edu"
+        self.created_user_emails.append(email)
+        return email
 
     def login_user(self, email, password):
         """Log in an existing registered user via the browser."""

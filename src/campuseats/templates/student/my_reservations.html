@@ -41,7 +41,7 @@
           {% endif %}
         </td>
         <td>
-          {% if r.status == 'cancelled' and r.cancellation_reason == 'Cancelled by vendor' %}
+          {% if r.status == 'cancelled' and (r.cancellation_reason == r.CANCELLATION_REASON_VENDOR or r.cancellation_reason == 'Cancelled by vendor') %}
           <span class="badge bg-danger">Cancelled by Vendor</span>
           {% else %}
           <span class="badge bg-{{ badge_colors.get(r.status, 'secondary') }}">{{ r.status }}</span>

@@ -118,7 +118,7 @@ class StudentListingsFeedTest(unittest.TestCase):
         self.assertLess(body.index(b"Sooner Meal"), body.index(b"Later Meal"))
 
     def test_overnight_pickup_window_renders_end_date(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now().astimezone()
         with self.app.app_context():
             listing = Listing(
                 vendor_id=self.vendor_id,
