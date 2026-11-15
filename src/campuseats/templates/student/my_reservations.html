@@ -44,6 +44,12 @@
                 onsubmit="return confirm('Cancel this reservation?');">
             <button type="submit" class="btn btn-outline-danger btn-sm">Cancel</button>
           </form>
+          {% elif r.status == 'picked up' %}
+            {% if r.rating %}
+              <span class="badge bg-warning text-dark">Rated: {{ r.rating.stars }} ★</span>
+            {% else %}
+              <a href="{{ url_for('student.rate_reservation', reservation_id=r.id) }}" class="btn btn-outline-success btn-sm">Rate Pickup</a>
+            {% endif %}
           {% endif %}
         </td>
       </tr>

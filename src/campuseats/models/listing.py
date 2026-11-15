@@ -79,5 +79,23 @@ class Listing(db.Model):
             return "ended"
         return self.status
 
+    @property
+    def ratings(self):
+        """Retrieve all rating records associated with reservations for this listing."""
+        return [res.rating for res in self.reservations if getattr(res, "rating", None) is not None]
+
+    @property
+    def average_rating(self):
+        """Compute average star rating, returning None when no ratings exist."""
+        all_ratings = self.ratings
+        if not all_ratings:
+            return None
+        return round(sum(r.stars for r in all_ratings) / len(all_ratings), 1)
+
+    @property
+    def reviews_with_comments(self):
+        """Retrieve ratings that contain non-empty comment text."""
+        return [r for r in self.ratings if r.comment and r.comment.strip()]
+
     def __repr__(self):
         return f"<Listing {self.title}>"

@@ -62,6 +62,12 @@ class Reservation(db.Model):
 
     student = db.relationship("User", back_populates="reservations")
     listing = db.relationship("Listing", back_populates="reservations")
+    rating = db.relationship(
+        "Rating",
+        back_populates="reservation",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<Reservation {self.id} {self.pickup_code} ({self.status})>"

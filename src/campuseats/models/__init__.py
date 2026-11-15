@@ -5,6 +5,7 @@ from campuseats.models.listing import (
     Listing,
     listing_dietary_tags,
 )
+from campuseats.models.rating import Rating
 from campuseats.models.reservation import (
     RESERVATION_STATUSES,
     Reservation,
@@ -20,4 +21,5 @@ __all__ = [
     "Reservation",
     "RESERVATION_STATUSES",
     "generate_unique_pickup_code",
+    "Rating",
 ]

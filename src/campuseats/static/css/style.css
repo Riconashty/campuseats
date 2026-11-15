@@ -94,3 +94,58 @@
 .modal-backdrop.show {
     opacity: 0.5;
 }
+
+/* Interactive Star Rating Component */
+.star-rating {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    gap: 0;
+}
+
+.star-rating .star-input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.star-rating .star-label {
+    cursor: pointer;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    margin: 0;
+    transition: transform 0.15s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.star-rating .star-label .star-icon {
+    pointer-events: none;
+    fill: transparent;
+    stroke: #f59e0b;
+    transition: fill 0.15s ease-in-out, stroke 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+.star-rating .star-label:hover .star-icon,
+.star-rating .star-label:hover ~ .star-label .star-icon {
+    fill: #f59e0b;
+    transform: scale(1.15);
+}
+
+.star-rating .star-input:checked ~ .star-label .star-icon {
+    fill: #f59e0b;
+}
+
+.star-rating .star-label:active .star-icon {
+    transform: scale(0.9);
+}
+
+.star-rating .star-input:focus-visible + .star-label {
+    outline: 2px dashed #f59e0b;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
