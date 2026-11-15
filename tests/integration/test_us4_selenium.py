@@ -60,6 +60,86 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
     """Automated black box browser test suite for US4 (Student Portion Reservation)."""
 
     driver = None
+    created_listing_titles = []
+    created_user_emails = []
+
+    @classmethod
+    def cleanup_test_database(cls, app=None):
+        """Clean up test listings, reservations, and orphaned test users from the database."""
+        try:
+            if app is None:
+                from campuseats import create_app
+                from campuseats.config import Config
+
+                app = create_app(Config)
+
+            from campuseats.extensions import db
+            from campuseats.models.listing import Listing
+            from campuseats.models.reservation import Reservation
+            from campuseats.models.user import User
+
+            with app.app_context():
+                # Guard against running database cleanup against unintended environments
+                db_url = str(db.engine.url).lower()
+                is_safe_env = (
+                    app.config.get("TESTING", False)
+                    or "localhost" in db_url
+                    or "127.0.0.1" in db_url
+                    or ":memory:" in db_url
+                    or "campuseats_test" in db_url
+                )
+                if not is_safe_env:
+                    print(
+                        f"Warning: Selenium DB cleanup skipped for safety (unrecognized target: {db_url})",
+                        file=sys.stderr,
+                    )
+                    return
+
+                # Sweep both tracked listing titles and orphaned test listings matching patterns
+                patterns = [
+                    "Fresh Sandwiches %",
+                    "Last Bagel %",
+                    "Pasta Trays %",
+                    "Last Muffin %",
+                ]
+                filters = [Listing.title.like(p) for p in patterns]
+                if cls.created_listing_titles:
+                    filters.append(Listing.title.in_(cls.created_listing_titles))
+
+                listings_to_delete = (
+                    db.session.execute(db.select(Listing).filter(db.or_(*filters))).scalars().all()
+                )
+                for listing in listings_to_delete:
+                    db.session.execute(db.delete(Reservation).filter_by(listing_id=listing.id))
+                    db.session.delete(listing)
+
+                # Remove ephemeral test accounts created during selenium test executions
+                # Underscore is explicitly escaped so LIKE matches literal underscores rather than any single character
+                user_patterns = [
+                    r"selenium\_us4\_%",
+                    r"vendor\_%@campuseats.edu",
+                    r"student\_%@campuseats.edu",
+                    r"student1\_%@campuseats.edu",
+                    r"student2\_%@campuseats.edu",
+                ]
+                user_filters = [User.email.like(p, escape="\\") for p in user_patterns]
+                if cls.created_user_emails:
+                    user_filters.append(User.email.in_(cls.created_user_emails))
+
+                test_users = (
+                    db.session.execute(db.select(User).filter(db.or_(*user_filters)))
+                    .scalars()
+                    .all()
+                )
+                for user in test_users:
+                    db.session.delete(user)
+
+                db.session.commit()
+        except Exception as exc:
+            print(
+                f"Warning: Selenium DB cleanup skipped or encountered error: {exc}",
+                file=sys.stderr,
+            )
 
     @classmethod
     def setUpClass(cls):
@@ -72,6 +152,9 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
             )
 
         print_status_banner(is_running=True)
+
+        # Clean up any orphaned test data from previously interrupted test runs
+        cls.cleanup_test_database()
 
         chrome_options = Options()
         chrome_options.add_argument("--headless=new")
@@ -88,7 +171,8 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        """Shut down browser session after all tests finish."""
+        """Shut down browser session and remove test listings and reservations."""
+        cls.cleanup_test_database()
         if cls.driver:
             cls.driver.quit()
 
@@ -99,7 +183,9 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
 
     def generate_unique_email(self, prefix="selenium_us4"):
         """Generate unique email addresses to ensure tests remain idempotent and isolate state."""
-        return f"{prefix}_{uuid.uuid4().hex[:8]}@campuseats.edu"
+        email = f"{prefix}_{uuid.uuid4().hex[:8]}@campuseats.edu"
+        self.created_user_emails.append(email)
+        return email
 
     def login_user(self, email, password):
         """Log in an existing registered user via the browser."""
@@ -140,6 +226,7 @@ class TestUS4SeleniumBlackBox(unittest.TestCase):
 
     def post_listing_as_vendor(self, title, portions=5):
         """Post a new surplus food listing as an authenticated vendor."""
+        self.created_listing_titles.append(title)
         vendor_email = self.generate_unique_email("vendor")
         self.register_and_login("Campus Bakery", vendor_email, "VendorPass123!", "vendor")
 

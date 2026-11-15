@@ -12,6 +12,7 @@ from werkzeug.security import check_password_hash
 from campuseats import create_app
 from campuseats.config import TestingConfig
 from campuseats.extensions import db
+from campuseats.models.listing import Listing
 from campuseats.models.user import User
 from campuseats.seed import seed_database
 
@@ -49,17 +50,29 @@ class SeedDatabaseTestCase(unittest.TestCase):
             self.assertEqual(student.name, "Alex Student")
             self.assertTrue(check_password_hash(student.password_hash, "Student123!"))
 
+            # Verify realistic surplus listings were created
+            listings = db.session.execute(db.select(Listing)).scalars().all()
+            self.assertEqual(len(listings), 4)
+            for item in listings:
+                self.assertEqual(item.vendor_id, vendor.id)
+                self.assertEqual(item.status, "active")
+                self.assertGreater(len(item.tags), 0)
+
     def test_seed_database_idempotent_when_users_already_exist(self):
         with self.app.app_context():
             seed_database()
             initial_count = len(db.session.execute(db.select(User)).scalars().all())
+            initial_listings_count = len(db.session.execute(db.select(Listing)).scalars().all())
 
-            # Second call should safely no-op without adding duplicate users
+            # Second call should safely no-op without adding duplicate users or listings
             seed_database()
             subsequent_count = len(db.session.execute(db.select(User)).scalars().all())
+            subsequent_listings_count = len(db.session.execute(db.select(Listing)).scalars().all())
 
             self.assertEqual(initial_count, subsequent_count)
             self.assertEqual(subsequent_count, 2)
+            self.assertEqual(initial_listings_count, subsequent_listings_count)
+            self.assertEqual(subsequent_listings_count, 4)
 
     def test_create_app_seeds_when_configured(self):
         class SeedConfig(TestingConfig):
@@ -72,6 +85,25 @@ class SeedDatabaseTestCase(unittest.TestCase):
             db.session.remove()
             db.drop_all()
             db.engine.dispose()
+
+    def test_seed_database_refreshes_stale_listings_when_all_expired(self):
+        from datetime import datetime, timedelta, timezone
+
+        with self.app.app_context():
+            seed_database()
+            now = datetime.now(timezone.utc)
+            # Expire all listings
+            listings = db.session.execute(db.select(Listing)).scalars().all()
+            for item in listings:
+                item.pickup_end = now - timedelta(hours=1)
+            db.session.commit()
+
+            # Calling seed_database again should refresh pickup windows so feed is not empty
+            seed_database()
+            refreshed = db.session.execute(db.select(Listing)).scalars().all()
+            for item in refreshed:
+                self.assertGreater(item.pickup_end, now)
+                self.assertEqual(item.status, "active")
 
     def test_create_app_does_not_seed_by_default_in_testing(self):
         with self.app.app_context():
