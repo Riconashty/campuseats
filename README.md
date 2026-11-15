@@ -14,6 +14,32 @@ CampusEats connects campus food vendors that have leftover food with students wh
 ### SCRUM Master
 [Riley Drenth](https://github.com/RileyDrenthMSU)
 
+---
+
+## SCRUM Documents
+
+The team followed a SCRUM methodology to manage the development of this project.
+Below lists the documents that show the development process.
+
+| Document | Description | Link |
+| --- | --- | --- |
+| Sprint Planning & Release Plan | Backlog scoring, velocity, and sprint goals | [SPRINT_PLANNING.md](scrum/SPRINT_PLANNING.md) |
+| Daily Standups | Asynchronous Discord standup logs | [DAILY_STANDUPS.md](scrum/DAILY_STANDUPS.md) |
+| Reviews & Retrospectives | Sprint 1–4 reviews and Sprint 1–3 retrospectives | [REVIEWS_AND_RETROSPECTIVES.md](scrum/REVIEWS_AND_RETROSPECTIVES.md) |
+| Sprint Boards | Exported Jira boards for all sprints | [all_sprint_boards.pdf](scrum/sprint_boards/all_sprint_boards.pdf) |
+| Burndown Chart | Project release burndown chart and metrics | [burndown.png](scrum/burndown.png) |
+| UML Architecture | Domain class diagram & sequence diagram | [uml/class.wsd](uml/class.wsd), [uml/sequence-US1.wsd](uml/sequence-US1.wsd) |
+
+## Testing
+
+Testing was done through a mix of automated gates and manual verification at each step of development:
+
+- **Local Verification Gate (`./scripts/verify.sh`):** Before committing or opening a PR, developers ran `./scripts/verify.sh`. This runs Ruff formatting, Ruff linting, and the pytest test suite, enforcing a strict minimum of 80% code coverage.
+- **GitHub Actions CI (`.github/workflows/ci.yml`):** Every push and pull request targeting `dev` or `main` triggers GitHub Actions CI. It spins up an environment and runs the exact same checks (format, lint, and coverage gate) to prevent broken code from being merged.
+- **Selenium Automated Black Box Tests:** End-to-end browser tests run headless Chrome against the running Docker container to test full user stories through the UI (US1 auth and US4 reservations). These can be run anytime using `./scripts/run-selenium.sh` once the app is up.
+- **PR Reviewer Verification:** PRs required approval from a teammate other than the author before merging into `dev`. Reviewers pulled the branch, checked the code, ran the app locally, and walked through the changes in the browser to verify they worked.
+- **End-of-Sprint Manual Testing:** At the end of each sprint before creating releases, we started the full Docker Compose stack from scratch and re-tested all implemented user stories end-to-end.
+
 
 ## Running with Docker Compose
 
