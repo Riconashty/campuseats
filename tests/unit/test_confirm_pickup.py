@@ -698,3 +698,90 @@ class ConfirmPickupTestCase(unittest.TestCase):
                 db.select(Reservation).filter_by(pickup_code="DIR123")
             ).scalar_one()
             self.assertEqual(saved.status, "no-show")
+
+    def test_expired_reservation_displays_as_no_show_before_any_code_is_entered(self):
+        # US7 AC3: the status shown changes when the window ends, not when a late code arrives
+        self._create_and_login_user(
+            name="Display Vendor",
+            email="vendor_display@example.invalid",
+            password="Password123!",
+            role="vendor",
+        )
+        vendor_id, student_id, listing_id, reservation_id = self._create_test_data(
+            vendor_email="vendor_other_display@example.invalid",
+            pickup_code="DSP001",
+            pickup_start_offset_hours=-3,
+            pickup_end_offset_hours=-1,
+        )
+        with self.app.app_context():
+            reservation = db.session.get(Reservation, reservation_id)
+            self.assertEqual(reservation.status, "active")
+            self.assertEqual(reservation.display_status, "no-show")
+
+    def test_open_window_reservation_displays_its_stored_status(self):
+        for stored_status in ("active", "picked up", "cancelled", "no-show"):
+            with self.subTest(status=stored_status):
+                _, _, _, reservation_id = self._create_test_data(
+                    vendor_email=f"vendor_{stored_status[:3]}@example.invalid",
+                    student_email=f"student_{stored_status[:3]}@example.invalid",
+                    pickup_code=f"OPN{stored_status[:3].upper()}".replace(" ", "X")[:6],
+                    reservation_status=stored_status,
+                )
+                with self.app.app_context():
+                    reservation = db.session.get(Reservation, reservation_id)
+                    self.assertEqual(reservation.display_status, stored_status)
+
+    def test_pickup_rejected_when_the_listing_was_cancelled(self):
+        # Food is never handed out for a listing the vendor cancelled
+        self._create_and_login_user(
+            name="Cancelled Listing Vendor",
+            email="vendor_cancelled_listing@example.invalid",
+            password="Password123!",
+            role="vendor",
+        )
+        with self.app.app_context():
+            vendor = db.session.execute(
+                db.select(User).filter_by(email="vendor_cancelled_listing@example.invalid")
+            ).scalar_one()
+            student = User(
+                name="Student Cancelled Listing",
+                email="student_cancelled_listing@example.invalid",
+                password_hash="fakehash",
+                role="student",
+            )
+            listing = Listing(
+                vendor_id=vendor.id,
+                title="Cancelled Curry",
+                total_portions=5,
+                remaining_portions=4,
+                pickup_location="West Hall",
+                pickup_start=datetime.now() - timedelta(hours=1),
+                pickup_end=datetime.now() + timedelta(hours=1),
+                status="cancelled",
+            )
+            db.session.add_all([student, listing])
+            db.session.commit()
+            db.session.add(
+                Reservation(
+                    student_id=student.id,
+                    listing_id=listing.id,
+                    portions_reserved=1,
+                    pickup_code="CXL001",
+                    status="active",
+                )
+            )
+            db.session.commit()
+
+        response = self.client.post(
+            "/vendor/confirm-pickup",
+            data={"pickup_code": "CXL001"},
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Cannot confirm pickup. This listing was cancelled.", response.data)
+        self.assertNotIn(b"Pickup Confirmed!", response.data)
+        with self.app.app_context():
+            saved = db.session.execute(
+                db.select(Reservation).filter_by(pickup_code="CXL001")
+            ).scalar_one()
+            self.assertEqual(saved.status, "active")

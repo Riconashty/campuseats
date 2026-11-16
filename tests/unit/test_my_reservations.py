@@ -117,6 +117,32 @@ class MyReservationsTest(unittest.TestCase):
         for rid in (expired, cancelled, picked_up, no_show):
             self.assertNotIn(self.cancel_url(rid).encode(), body)
 
+    def test_expired_active_reservation_is_shown_as_no_show(self):
+        # US7 AC3 / US6 AC1: the status changes when the window ends, with no code entered
+        rid, lid = self.make_reservation(self.alice_id, "AAAAAA", hours_until_end=-1)
+        self.login_as(self.alice_id)
+        body = self.client.get("/student/reservations").data
+        self.assertIn(b">no-show</span>", body)
+        self.assertNotIn(b">active</span>", body)
+        # Viewing the page reports the status; it does not need to rewrite the stored row
+        self.assertEqual(self.state(rid, lid), ("active", 2))
+
+    def test_unexpired_active_reservation_is_still_shown_as_active(self):
+        self.make_reservation(self.alice_id, "AAAAAA")
+        self.login_as(self.alice_id)
+        body = self.client.get("/student/reservations").data
+        self.assertIn(b">active</span>", body)
+        self.assertNotIn(b">no-show</span>", body)
+
+    def test_usable_reservations_are_listed_before_expired_ones(self):
+        self.make_reservation(self.alice_id, "AAAAAA", title="Expired Meal", hours_until_end=-1)
+        self.make_reservation(self.alice_id, "BBBBBB", title="Open Meal")
+        self.make_reservation(self.alice_id, "CCCCCC", title="Another Expired", hours_until_end=-2)
+        self.login_as(self.alice_id)
+        body = self.client.get("/student/reservations").data.decode()
+        self.assertLess(body.index("Open Meal"), body.index("Expired Meal"))
+        self.assertLess(body.index("Open Meal"), body.index("Another Expired"))
+
     # ---- cancelling ----
 
     def test_cancel_releases_portions(self):
@@ -126,6 +152,9 @@ class MyReservationsTest(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].endswith("/student/reservations"))
         self.assertEqual(self.state(rid, lid), ("cancelled", 3))
+        with self.app.app_context():
+            res = db.session.get(Reservation, rid)
+            self.assertEqual(res.cancellation_reason, "Cancelled by student")
 
     def test_cancelling_twice_does_not_release_portions_twice(self):
         rid, lid = self.make_reservation(self.alice_id, "AAAAAA", portions=1, remaining=1)
@@ -189,3 +218,38 @@ class MyReservationsTest(unittest.TestCase):
     def test_logged_out_user_is_forbidden(self):
         self.assertEqual(self.client.get("/student/reservations").status_code, 403)
         self.assertEqual(self.client.post(self.cancel_url(1)).status_code, 403)
+
+    def test_vendor_cancelled_reservation_displays_badge_and_struck_pickup_code(self):
+        from campuseats.routes import vendor as vendor_routes
+
+        rid, lid = self.make_reservation(self.alice_id, "AAAAAA", portions=1)
+        fake_vendor = SimpleNamespace(id=self.vendor_id, is_authenticated=True, role="vendor")
+        with (
+            patch.object(role_guards, "current_user", fake_vendor),
+            patch.object(vendor_routes, "current_user", fake_vendor),
+        ):
+            cancel_res = self.client.post(f"/vendor/listings/{lid}/cancel")
+            self.assertEqual(cancel_res.status_code, 302)
+
+        self.login_as(self.alice_id)
+        response = self.client.get("/student/reservations")
+        self.assertEqual(response.status_code, 200)
+        body = response.data.decode("utf-8")
+        self.assertIn("Cancelled by Vendor", body)
+        self.assertIn(
+            '<del class="text-muted"><code class="fs-6 text-muted">AAAAAA</code></del>', body
+        )
+        self.assertNotIn(self.cancel_url(rid), body)
+
+    def test_student_cancelled_reservation_displays_struck_pickup_code(self):
+        rid, _ = self.make_reservation(self.alice_id, "BBBBBB", portions=1)
+        self.login_as(self.alice_id)
+        self.client.post(self.cancel_url(rid))
+        response = self.client.get("/student/reservations")
+        self.assertEqual(response.status_code, 200)
+        body = response.data.decode("utf-8")
+        self.assertIn(
+            '<del class="text-muted"><code class="fs-6 text-muted">BBBBBB</code></del>', body
+        )
+        self.assertIn("cancelled", body)
+        self.assertNotIn("Cancelled by Vendor", body)

@@ -163,6 +163,25 @@ class ManageListingsTestCase(unittest.TestCase):
         for text in ("Alice Adams", "alice@t.edu", "Bob Brown", "bob@t.edu"):
             self.assertIn(text, body)
 
+    def test_detail_shows_no_show_once_the_pickup_window_has_ended(self):
+        # US7 AC3: every reservation still active when the window ends is shown as no-show
+        lid = self.make_listing(hours_until_end=-1)
+        self.reserve(lid, self.alice_id, "AAAAAA", portions=2)
+        self.reserve(lid, self.bob_id, "BBBBBB", portions=1, status="picked up")
+        self.login_owner()
+        body = self.client.get(f"/vendor/listings/{lid}").data.decode()
+        self.assertIn(">No-show</span>", body)
+        self.assertIn(">Picked up</span>", body)
+        self.assertNotIn(">Active</span>", body)
+
+    def test_detail_shows_active_while_the_pickup_window_is_open(self):
+        lid = self.make_listing()
+        self.reserve(lid, self.alice_id, "AAAAAA")
+        self.login_owner()
+        body = self.client.get(f"/vendor/listings/{lid}").data.decode()
+        self.assertIn(">Active</span>", body)
+        self.assertNotIn(">No-show</span>", body)
+
     def test_detail_empty_state(self):
         lid = self.make_listing()
         self.login_owner()
@@ -222,6 +241,20 @@ class ManageListingsTestCase(unittest.TestCase):
 
     # ---- AC4: portion reduction guard ----
 
+    def test_edit_rejects_text_longer_than_the_database_columns(self):
+        lid = self.make_listing()
+        self.login_owner()
+        for field, value, message in (
+            ("title", "T" * 201, b"Title must be 200 characters or fewer."),
+            ("pickup_location", "L" * 256, b"Pickup Location must be 255 characters or fewer."),
+        ):
+            response = self.client.post(
+                f"/vendor/listings/{lid}/edit", data=self.form(**{field: value})
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(message, response.data)
+        self.assertEqual(self.listing_state(lid)["title"], "Bagels")
+
     def test_cannot_reduce_portions_below_reserved(self):
         lid = self.make_listing(total=10)
         self.reserve(lid, self.alice_id, "AAAAAA", portions=2)
@@ -258,6 +291,11 @@ class ManageListingsTestCase(unittest.TestCase):
         self.assertEqual(state["status"], "cancelled")
         self.assertEqual(state["reservations"], [("AAAAAA", "cancelled"), ("BBBBBB", "picked up")])
         self.assertEqual(state["remaining"], 9)
+        with self.app.app_context():
+            res_alice = db.session.execute(
+                db.select(Reservation).filter_by(pickup_code="AAAAAA")
+            ).scalar_one()
+            self.assertEqual(res_alice.cancellation_reason, Reservation.CANCELLATION_REASON_VENDOR)
 
     def test_cancelled_listing_disappears_from_student_feed(self):
         lid = self.make_listing(title="Soon Gone")

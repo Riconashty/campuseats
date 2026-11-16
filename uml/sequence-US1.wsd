@@ -1,5 +1,7 @@
 @startuml US1
 
+title US1: Register and log in
+
 autonumber
 
 actor User
@@ -10,33 +12,64 @@ database PostgreSQL as DB
 
 == Register ==
 
-User -> Browser : fill in name, email, password role;\nclick "Register"
+User -> Browser : fill in name, email, password, role;\nclick "Create Account"
 Browser -> Route : POST /register
 
-alt a required field is empty or password is under 8 characters
-    Route -> Browser : re-render form, mark the field with the problem
+alt a required field is empty
+    Route --> Browser : 200 registration page\n"Missing: <field>."
+else name or email is longer than its column
+    Route --> Browser : 200 registration page\n"<field> must be <n> characters or fewer."
+else password is under 8 characters
+    Route --> Browser : 200 registration page\n"Password must be at least 8 characters long."
 else all fields valid
     Route -> Model : find user by email
     Model -> DB : SELECT * FROM users WHERE email = ?
     DB --> Model : matching row or nothing
     Model --> Route : User or None
+
+    alt the email is already registered
+        Route --> Browser : 200 registration page\n"An account with that email already exists."
+        note right of Route : no row is written
+    else the email is new
+        Route -> Route : generate_password_hash(password)
+        note right of Route : only the hash is kept;\nthe plain password is never stored
+        Route -> Model : User(name, email, password_hash, role)
+        Model -> DB : INSERT INTO users (name, email, password_hash, role)
+        Model -> DB : COMMIT
+        DB --> Model : new row id
+        Model --> Route : saved User
+        Route --> Browser : 302 redirect to /login\n"Account created successfully!"
+        Browser -> Route : GET /login
+        Route --> Browser : 200 login page
+    end
 end
 
 == Log in ==
-User -> Browser : fill in email, password;\nclick "Log in"
+
+User -> Browser : fill in email, password;\nclick "Log In"
 Browser -> Route : POST /login
-Route -> Model : find user by email
-Model -> DB : SELECT * FROM users WHERE email = ?
-DB --> Model : matching row or nothing
-Model --> Route : User or None
 
-alt credentials exists
-    Route -> Route : Login_user(user)
-    Route -> Browser : redirect to home page for user's role
-    Model -> User : Display error message, redirect to sign in
-else wrong credentials
-    Route -> Browser : Display error message, redirect to sign in
+alt email or password is empty
+    Route --> Browser : 200 login page\n"Missing: <field>."
+else both fields filled in
+    Route -> Model : find user by email
+    Model -> DB : SELECT * FROM users WHERE email = ?
+    DB --> Model : matching row or nothing
+    Model --> Route : User or None
+    Route -> Route : check_password_hash(user.password_hash, password)
+
+    alt user exists and the password matches the stored hash
+        Route -> Route : login_user(user)
+        note right of Route : Flask-Login puts the user id\nin the signed session cookie
+        alt role is student
+            Route --> Browser : 302 redirect to /listings
+        else role is vendor
+            Route --> Browser : 302 redirect to /vendor/listings
+        end
+    else no such user, or wrong password
+        Route --> Browser : 200 login page\n"Invalid email or password."
+        note right of Route : the user stays logged out
+    end
 end
-
 
 @enduml

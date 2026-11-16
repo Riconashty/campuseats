@@ -28,6 +28,8 @@ def generate_unique_pickup_code(session, length=6):
 
 class Reservation(db.Model):
     __tablename__ = "reservations"
+    CANCELLATION_REASON_VENDOR = "Cancelled by vendor"
+
     __table_args__ = (
         db.CheckConstraint(
             "portions_reserved >= 1 AND portions_reserved <= 2",
@@ -54,6 +56,7 @@ class Reservation(db.Model):
         default="active",
         server_default="active",
     )
+    cancellation_reason = db.Column(db.String(100), nullable=True)
     created_at = db.Column(
         db.DateTime(timezone=True),
         nullable=False,
@@ -62,6 +65,25 @@ class Reservation(db.Model):
 
     student = db.relationship("User", back_populates="reservations")
     listing = db.relationship("Listing", back_populates="reservations")
+    rating = db.relationship(
+        "Rating",
+        back_populates="reservation",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def display_status(self):
+        """The status to show users (US7 AC3).
+
+        An active reservation becomes a no-show the moment its listing's pickup window ends,
+        whether or not the vendor ever enters its code. Deriving it here, the same way
+        Listing.display_status derives "ended", keeps every page in agreement without a
+        background job.
+        """
+        if self.status == "active" and self.listing is not None and self.listing.has_ended():
+            return "no-show"
+        return self.status
 
     def __repr__(self):
         return f"<Reservation {self.id} {self.pickup_code} ({self.status})>"

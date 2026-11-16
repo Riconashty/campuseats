@@ -33,17 +33,33 @@
             {{ r.listing.pickup_end.strftime('%b %d, %I:%M %p') }}
         </td>
         <td>{{ r.portions_reserved }}</td>
-        <td><code class="fs-6">{{ r.pickup_code }}</code></td>
         <td>
-          <span class="badge bg-{{ badge_colors.get(r.status, 'secondary') }}">{{ r.status }}</span>
+          {% if r.status == 'cancelled' %}
+          <del class="text-muted"><code class="fs-6 text-muted">{{ r.pickup_code }}</code></del>
+          {% else %}
+          <code class="fs-6">{{ r.pickup_code }}</code>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.status == 'cancelled' and (r.cancellation_reason == r.CANCELLATION_REASON_VENDOR or r.cancellation_reason == 'Cancelled by vendor') %}
+          <span class="badge bg-danger">Cancelled by Vendor</span>
+          {% else %}
+          <span class="badge bg-{{ badge_colors.get(r.display_status, 'secondary') }}">{{ r.display_status }}</span>
+          {% endif %}
         </td>
         <td class="text-end">
-          {% if r.status == 'active' and r.listing.pickup_end > now %}
+          {% if r.display_status == 'active' %}
           <form method="post"
                 action="{{ url_for('student.cancel_reservation', reservation_id=r.id) }}"
                 onsubmit="return confirm('Cancel this reservation?');">
             <button type="submit" class="btn btn-outline-danger btn-sm">Cancel</button>
           </form>
+          {% elif r.status == 'picked up' %}
+            {% if r.rating %}
+              <span class="badge bg-warning text-dark">Rated: {{ r.rating.stars }} ★</span>
+            {% else %}
+              <a href="{{ url_for('student.rate_reservation', reservation_id=r.id) }}" class="btn btn-outline-success btn-sm">Rate Pickup</a>
+            {% endif %}
           {% endif %}
         </td>
       </tr>

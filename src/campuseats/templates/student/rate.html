@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Rate Pickup | CampusEats{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow-sm border-0 rounded-3">
+            <div class="card-header bg-success text-white py-3">
+                <h4 class="mb-0 fw-bold">Rate Your Pickup</h4>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-4 p-3 bg-light rounded border">
+                    <h5 class="fw-bold mb-1">{{ reservation.listing.title }}</h5>
+                    <p class="text-muted mb-1">
+                        <strong>Vendor:</strong> {{ reservation.listing.vendor.name }}
+                    </p>
+                    <p class="text-muted mb-1">
+                        <strong>Pickup Location:</strong> {{ reservation.listing.pickup_location }}
+                    </p>
+                    <p class="text-muted mb-0">
+                        <strong>Portions:</strong> {{ reservation.portions_reserved }} &bull;
+                        <strong>Pickup Code:</strong> <code>{{ reservation.pickup_code }}</code>
+                    </p>
+                </div>
+
+                <form method="POST" action="{{ url_for('student.rate_reservation', reservation_id=reservation.id) }}">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Star Rating <span class="text-danger">*</span></label>
+                        <div class="py-2">
+                            <div class="star-rating d-inline-flex flex-row-reverse align-items-center" role="radiogroup" aria-label="Star Rating" id="star-rating-group">
+                                {% for val in [5, 4, 3, 2, 1] %}
+                                    <input class="star-input" type="radio" name="stars" id="star_{{ val }}" value="{{ val }}" required {% if stars|string == val|string %}checked{% endif %}>
+                                    <label class="star-label" for="star_{{ val }}" title="{{ val }} star{% if val != 1 %}s{% endif %}" data-star="{{ val }}">
+                                        <svg class="star-icon" viewBox="0 0 24 24" width="36" height="36" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                        </svg>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            <div id="star-rating-hint" class="small fw-semibold text-muted mt-2">
+                                {% if stars %}
+                                    {{ stars }} of 5 stars selected
+                                {% else %}
+                                    Click to rate (1 to 5 stars)
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="comment" class="form-label fw-bold">Feedback / Comments (Optional)</label>
+                        <textarea class="form-control" id="comment" name="comment" rows="4" maxlength="300" placeholder="Provide feedback on food quality, portions, or pickup experience (maximum 300 characters)...">{{ comment or '' }}</textarea>
+                        <div class="form-text">Maximum 300 characters.</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('student.my_reservations') }}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-success px-4">
+                            Submit Rating
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var ratingLabels = {
+        "1": "1 Star - Poor",
+        "2": "2 Stars - Fair",
+        "3": "3 Stars - Good",
+        "4": "4 Stars - Very Good",
+        "5": "5 Stars - Excellent"
+    };
+    var hintElement = document.getElementById("star-rating-hint");
+    var ratingGroup = document.getElementById("star-rating-group");
+    var starInputs = document.querySelectorAll(".star-input");
+    var starLabels = document.querySelectorAll(".star-label");
+
+    function getSelectedRating() {
+        var checkedInput = document.querySelector(".star-input:checked");
+        return checkedInput ? checkedInput.value : null;
+    }
+
+    function updateHint(val) {
+        if (!hintElement) return;
+        if (val && ratingLabels[val]) {
+            hintElement.textContent = ratingLabels[val];
+            hintElement.className = "small fw-semibold text-warning mt-2";
+        } else {
+            var selected = getSelectedRating();
+            if (selected && ratingLabels[selected]) {
+                hintElement.textContent = ratingLabels[selected];
+                hintElement.className = "small fw-semibold text-warning mt-2";
+            } else {
+                hintElement.textContent = "Click to rate (1 to 5 stars)";
+                hintElement.className = "small fw-semibold text-muted mt-2";
+            }
+        }
+    }
+
+    starLabels.forEach(function (label) {
+        label.addEventListener("mouseenter", function () {
+            var val = this.getAttribute("data-star");
+            updateHint(val);
+        });
+        label.addEventListener("mousemove", function () {
+            var val = this.getAttribute("data-star");
+            updateHint(val);
+        });
+    });
+
+    if (ratingGroup) {
+        ratingGroup.addEventListener("mouseleave", function () {
+            updateHint(null);
+        });
+    }
+
+    starInputs.forEach(function (input) {
+        input.addEventListener("change", function () {
+            updateHint(this.value);
+        });
+    });
+
+    var initialSelected = getSelectedRating();
+    if (initialSelected) {
+        updateHint(initialSelected);
+    }
+});
+</script>
+{% endblock %}

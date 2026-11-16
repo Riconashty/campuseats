@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from campuseats.extensions import db
 
@@ -9,6 +9,26 @@ DEFAULT_DIETARY_TAGS = (
     "halal",
     "contains nuts",
 )
+
+
+class UTCDateTime(db.TypeDecorator):
+    """DateTime type that standardizes storage in UTC and localizes for display."""
+
+    impl = db.DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            return value.astimezone(timezone.utc)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            return value.astimezone()
+        return value
+
 
 # Association table between listings and dietary tags
 listing_dietary_tags = db.Table(
@@ -48,8 +68,8 @@ class Listing(db.Model):
     total_portions = db.Column(db.Integer, nullable=False)
     remaining_portions = db.Column(db.Integer, nullable=False)
     pickup_location = db.Column(db.String(255), nullable=False)
-    pickup_start = db.Column(db.DateTime, nullable=False)
-    pickup_end = db.Column(db.DateTime, nullable=False)
+    pickup_start = db.Column(UTCDateTime, nullable=False)
+    pickup_end = db.Column(UTCDateTime, nullable=False)
     status = db.Column(db.String(20), nullable=False, default="active", server_default="active")
     created_at = db.Column(
         db.DateTime(timezone=True),
@@ -73,11 +93,40 @@ class Listing(db.Model):
     def reserved_portions(self):
         return self.total_portions - self.remaining_portions
 
+    def has_ended(self, now=None):
+        """True once the pickup window is over. The end instant itself counts as ended."""
+        end = self.pickup_end
+        if end is None:
+            return False
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        if now is None:
+            now = datetime.now(timezone.utc)
+        return end <= now
+
     @property
     def display_status(self):
-        if self.status == "active" and self.pickup_end <= datetime.now():
+        if self.status == "active" and self.has_ended():
             return "ended"
         return self.status
+
+    @property
+    def ratings(self):
+        """Retrieve all rating records associated with reservations for this listing."""
+        return [res.rating for res in self.reservations if getattr(res, "rating", None) is not None]
+
+    @property
+    def average_rating(self):
+        """Compute average star rating, returning None when no ratings exist."""
+        all_ratings = self.ratings
+        if not all_ratings:
+            return None
+        return round(sum(r.stars for r in all_ratings) / len(all_ratings), 1)
+
+    @property
+    def reviews_with_comments(self):
+        """Retrieve ratings that contain non-empty comment text."""
+        return [r for r in self.ratings if r.comment and r.comment.strip()]
 
     def __repr__(self):
         return f"<Listing {self.title}>"

@@ -27,7 +27,9 @@ services:
       PORT: 5001
       FLASK_DEBUG: 0
       SEED_DEMO_USERS: "true"
+      TZ: America/Denver
     ports:
+      - "5000:5001"
       - "5001:5001"
     depends_on:
       db:

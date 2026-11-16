@@ -1,57 +1,21 @@
-import os
-import sys
+"""Selenium black box tests for US1: Register and log in.
+
+US4 (tests/integration/test_us4_selenium.py) is the team's one fully automated story. These
+tests are kept as extra regression coverage for the pages every other story depends on.
+
+US1 AC4 (passwords are stored hashed) cannot be seen through a browser, so it is not
+checked here. It is covered by tests/unit/test_registration.py and by the manual check in
+tests/manual-tests.md.
+"""
+
 import unittest
-import urllib.error
-import urllib.request
 import uuid
 
-from selenium import webdriver
-from selenium.common.exceptions import WebDriverException
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
-BASE_URL = os.environ.get("BASE_URL", "http://localhost:5001").rstrip("/")
-
-
-def is_server_reachable(target_url, timeout=1.5):
-    """Check if the live HTTP web server is reachable before launching browser tests."""
-    try:
-        request = urllib.request.Request(
-            f"{target_url}/",
-            headers={"User-Agent": "Mozilla/5.0 (Automated Black Box Test)"},
-        )
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.status in (200, 301, 302, 404)
-    except Exception:
-        return False
-
-
-def print_status_banner(is_running):
-    """Print prominent visual diagnostics distinguishing running vs skipped test executions."""
-    border = "=" * 72
-    if is_running:
-        message = (
-            f"\n{border}\n"
-            " CampusEats Selenium Black Box Tests: RUNNING\n"
-            f" Target Endpoint: {BASE_URL} (Headless Chrome)\n"
-            " Scope: User Story 1 (Register and Log In) Acceptance Criteria\n"
-            f"{border}\n"
-        )
-    else:
-        message = (
-            f"\n{border}\n"
-            " CampusEats Selenium Black Box Tests: SKIPPED\n"
-            f" Target Endpoint: {BASE_URL}\n"
-            " Status: Live application server is not currently reachable.\n"
-            " How to run these tests:\n"
-            "   Start app via Docker: 'docker compose up'\n"
-            "   OR locally:          './scripts/start-db.sh && python run.py'\n"
-            "   Then execute:        './scripts/run-selenium.sh'\n"
-            f"{border}\n"
-        )
-    print(message, file=sys.stderr)
+from .browser import BASE_URL, require_live_server, start_chrome
 
 
 class TestUS1SeleniumBlackBox(unittest.TestCase):
@@ -62,27 +26,9 @@ class TestUS1SeleniumBlackBox(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Verify server readiness, initialize headless Chrome, and establish session."""
-        if not is_server_reachable(BASE_URL):
-            print_status_banner(is_running=False)
-            raise unittest.SkipTest(
-                f"CampusEats server unreachable at {BASE_URL}. "
-                "Start the server with 'docker compose up' or 'python run.py' to run Selenium tests."
-            )
-
-        print_status_banner(is_running=True)
-
-        chrome_options = Options()
-        chrome_options.add_argument("--headless=new")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920,1080")
-
-        try:
-            cls.driver = webdriver.Chrome(options=chrome_options)
-            cls.driver.implicitly_wait(5)
-        except WebDriverException as exc:
-            raise unittest.SkipTest(f"Headless Chrome could not be initialized: {exc}")
+        require_live_server("User Story 1 (Register and Log In) Acceptance Criteria")
+        cls.driver = start_chrome()
+        cls.driver.implicitly_wait(5)
 
     @classmethod
     def tearDownClass(cls):
@@ -165,17 +111,41 @@ class TestUS1SeleniumBlackBox(unittest.TestCase):
         self.assertIn("An account with that email already exists.", alert.text)
 
     def test_us1_ac3_missing_required_fields(self):
-        """AC 3: Missing required form fields trigger validation and prevent submission."""
-        self.driver.get(f"{BASE_URL}/register")
+        """AC 3: Each empty required field is identified and no account is created."""
+        password = "MissingField123!"
+        for missing_field in ("Name", "Email", "Password", "Role"):
+            with self.subTest(missing=missing_field):
+                email = self.generate_unique_email(prefix="missing")
+                self.driver.get(f"{BASE_URL}/register")
+                # Turn off the browser's own "required" check so the server has to answer
+                self.driver.execute_script("document.querySelector('form').noValidate = true;")
 
-        self.driver.execute_script("document.querySelector('form').noValidate = true;")
-        self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+                if missing_field != "Name":
+                    self.driver.find_element(By.ID, "name").send_keys("Missing Field User")
+                if missing_field != "Email":
+                    self.driver.find_element(By.ID, "email").send_keys(email)
+                if missing_field != "Password":
+                    self.driver.find_element(By.ID, "password").send_keys(password)
+                if missing_field != "Role":
+                    Select(self.driver.find_element(By.ID, "role")).select_by_value("student")
+                self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
 
-        self.assertIn("/register", self.driver.current_url)
-        alert = WebDriverWait(self.driver, 5).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-danger"))
-        )
-        self.assertIn("Please complete all required fields", alert.text)
+                self.assertIn("/register", self.driver.current_url)
+                alert = WebDriverWait(self.driver, 5).until(
+                    EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-danger"))
+                )
+                self.assertIn(f"Missing: {missing_field}.", alert.text)
+
+                if missing_field != "Email":
+                    # No account was created: the same email and password cannot log in
+                    self.driver.get(f"{BASE_URL}/login")
+                    self.driver.find_element(By.ID, "email").send_keys(email)
+                    self.driver.find_element(By.ID, "password").send_keys(password)
+                    self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+                    alert = WebDriverWait(self.driver, 5).until(
+                        EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-danger"))
+                    )
+                    self.assertIn("Invalid email or password.", alert.text)
 
     def test_us1_ac3_password_too_short(self):
         """AC 3: Passwords shorter than 8 characters are rejected with a descriptive error."""
@@ -194,8 +164,35 @@ class TestUS1SeleniumBlackBox(unittest.TestCase):
         )
         self.assertIn("Password must be at least 8 characters long.", alert.text)
 
-    def test_us1_ac5_invalid_login_credentials(self):
-        """AC 5: Logging in with bad password or unregistered email fails with a clear alert."""
+    def test_us1_ac5_wrong_password_for_existing_account(self):
+        """AC 5: With a wrong password I see an error and stay logged out."""
+        email = self.generate_unique_email(prefix="wrong_pass")
+
+        self.driver.get(f"{BASE_URL}/register")
+        self.driver.find_element(By.ID, "name").send_keys("Wrong Password User")
+        self.driver.find_element(By.ID, "email").send_keys(email)
+        self.driver.find_element(By.ID, "password").send_keys("CorrectPass123!")
+        Select(self.driver.find_element(By.ID, "role")).select_by_value("student")
+        self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+        WebDriverWait(self.driver, 5).until(EC.url_contains("/login"))
+
+        self.driver.find_element(By.ID, "email").send_keys(email)
+        self.driver.find_element(By.ID, "password").send_keys("WrongPassword123!")
+        self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+
+        self.assertIn("/login", self.driver.current_url)
+        alert = WebDriverWait(self.driver, 5).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-danger"))
+        )
+        self.assertIn("Invalid email or password.", alert.text)
+
+        # Still logged out: the navigation bar offers Login, not Logout
+        navbar = self.driver.find_element(By.CLASS_NAME, "navbar-nav").text
+        self.assertIn("Login", navbar)
+        self.assertNotIn("Logout", navbar)
+
+    def test_us1_ac5_unregistered_email_rejected(self):
+        """AC 5: Logging in with an email that has no account fails with a clear alert."""
         self.driver.get(f"{BASE_URL}/login")
 
         self.driver.find_element(By.ID, "email").send_keys("nonexistent_user@campuseats.edu")
@@ -207,6 +204,29 @@ class TestUS1SeleniumBlackBox(unittest.TestCase):
             EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert-danger"))
         )
         self.assertIn("Invalid email or password.", alert.text)
+
+    def test_us1_ac5_login_lands_on_the_home_page_for_each_role(self):
+        """AC 5: A student lands on the listings feed and a vendor on My Listings."""
+        for role, home_path in (("student", "/listings"), ("vendor", "/vendor/listings")):
+            with self.subTest(role=role):
+                self.driver.delete_all_cookies()
+                email = self.generate_unique_email(prefix=f"home_{role}")
+                password = "RoleHomePass123!"
+
+                self.driver.get(f"{BASE_URL}/register")
+                self.driver.find_element(By.ID, "name").send_keys(f"Role Home {role}")
+                self.driver.find_element(By.ID, "email").send_keys(email)
+                self.driver.find_element(By.ID, "password").send_keys(password)
+                Select(self.driver.find_element(By.ID, "role")).select_by_value(role)
+                self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+                WebDriverWait(self.driver, 5).until(EC.url_contains("/login"))
+
+                self.driver.find_element(By.ID, "email").send_keys(email)
+                self.driver.find_element(By.ID, "password").send_keys(password)
+                self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+                WebDriverWait(self.driver, 5).until(lambda d: "/login" not in d.current_url)
+
+                self.assertEqual(self.driver.current_url, f"{BASE_URL}{home_path}")
 
     def test_us1_ac5_valid_login_and_logout(self):
         """AC 5: Valid login authenticates user, updates navigation bar, and logout clears session."""

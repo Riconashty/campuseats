@@ -4,7 +4,7 @@ from campuseats.config import Config
 from campuseats.routes.main import main_bp
 from campuseats.routes.student import student_bp
 from campuseats.extensions import db, login_manager
-from campuseats.models import DietaryTag, Listing, Reservation, User
+from campuseats.models import DietaryTag, Listing, Rating, Reservation, User
 from campuseats.routes.auth import auth_bp
 from campuseats.routes.vendor import vendor_bp
 from campuseats.seed import seed_database
@@ -40,6 +40,13 @@ def create_app(config_class=Config):
     with app.app_context():
         db.session.execute(text("SELECT 1"))  # fails loudly if the DB is unreachable
         db.create_all()  # builds tables for any models (none exist yet)
+        if db.engine.dialect.name == "postgresql":
+            db.session.execute(
+                text(
+                    "ALTER TABLE reservations ADD COLUMN IF NOT EXISTS cancellation_reason VARCHAR(100)"
+                )
+            )
+            db.session.commit()
         if app.config.get("SEED_DEMO_USERS"):
             seed_database()
 

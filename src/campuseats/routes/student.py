@@ -1,12 +1,12 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user
-from sqlalchemy import case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from campuseats.extensions import db
-from campuseats.models.listing import Listing
+from campuseats.models.listing import DEFAULT_DIETARY_TAGS, DietaryTag, Listing
+from campuseats.models.rating import Rating
 from campuseats.models.reservation import Reservation, generate_unique_pickup_code
 from campuseats.routes.role_guards import student_required
 
@@ -16,18 +16,44 @@ student_bp = Blueprint("student", __name__)
 @student_bp.route("/listings", methods=["GET"])
 @student_required
 def listings():
-    # Retrieve active surplus food listings whose pickup windows have not yet elapsed
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
+
+    # Read filters from the URL, e.g. /listings?tags=vegan&tags=halal&location=Student+Union
+    selected_tags = []
+    for raw_tag in request.args.getlist("tags"):
+        tag_name = raw_tag.strip().lower()
+        # Ignore anything that is not a real tag, and ignore repeats
+        if tag_name in DEFAULT_DIETARY_TAGS and tag_name not in selected_tags:
+            selected_tags.append(tag_name)
+    selected_location = request.args.get("location", "").strip()
+
+    # A listing is available when it is active, has portions left, and has not ended
+    available = (
+        Listing.status == "active",
+        Listing.remaining_portions > 0,
+        Listing.pickup_end > now,
+    )
+
+    listings_query = (
+        db.select(Listing)
+        .options(selectinload(Listing.vendor), selectinload(Listing.tags))
+        .filter(*available)
+    )
+    for tag_name in selected_tags:
+        listings_query = listings_query.filter(Listing.tags.any(DietaryTag.name == tag_name))
+    if selected_location:
+        listings_query = listings_query.filter(Listing.pickup_location == selected_location)
     available_listings = (
+        db.session.execute(listings_query.order_by(Listing.pickup_end.asc())).scalars().all()
+    )
+    # Dropdown choices: every location that currently has an available listing.
+    # Built from the unfiltered feed so the choices do not shrink once a filter is applied.
+    location_options = (
         db.session.execute(
-            db.select(Listing)
-            .options(selectinload(Listing.vendor), selectinload(Listing.tags))
-            .filter(
-                Listing.status == "active",
-                Listing.remaining_portions > 0,
-                Listing.pickup_end > now,
-            )
-            .order_by(Listing.pickup_end.asc())
+            db.select(Listing.pickup_location)
+            .filter(*available)
+            .distinct()
+            .order_by(Listing.pickup_location)
         )
         .scalars()
         .all()
@@ -64,6 +90,11 @@ def listings():
         listings=available_listings,
         active_reservations_by_listing=active_reservations_by_listing,
         recent_reservation=recent_reservation,
+        available_tags=DEFAULT_DIETARY_TAGS,
+        selected_tags=selected_tags,
+        location_options=location_options,
+        selected_location=selected_location,
+        filters_active=bool(selected_tags or selected_location),
     )
 
 
@@ -85,7 +116,7 @@ def reserve_listing(listing_id):
         db.select(Listing).filter_by(id=listing_id).with_for_update()
     ).scalar_one_or_none()
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     if listing is None or listing.status != "active" or listing.pickup_end <= now:
         db.session.rollback()
         flash("This listing is no longer available for reservation.", "danger")
@@ -143,20 +174,105 @@ def my_reservations():
     reservations = (
         db.session.execute(
             db.select(Reservation)
-            .options(selectinload(Reservation.listing).selectinload(Listing.vendor))
-            .filter_by(student_id=current_user.id)
-            .order_by(
-                case((Reservation.status == "active", 0), else_=1),
-                Reservation.created_at.desc(),
+            .options(
+                selectinload(Reservation.listing).selectinload(Listing.vendor),
+                selectinload(Reservation.rating),
             )
+            .filter_by(student_id=current_user.id)
+            .order_by(Reservation.created_at.desc())
         )
         .scalars()
         .all()
     )
+    # Reservations that can still be used come first. An active reservation whose pickup
+    # window has ended is shown as a no-show (Reservation.display_status), so it sorts with
+    # the finished ones. sorted() is stable, so each group stays newest first.
+    reservations = sorted(reservations, key=lambda r: r.display_status != "active")
+    return render_template("student/my_reservations.html", reservations=reservations)
+
+
+@student_bp.route("/student/reservations/<int:reservation_id>/rate", methods=["GET", "POST"])
+@student_required
+def rate_reservation(reservation_id):
+    # Query reservation with associated listing, vendor, and existing rating
+    reservation = db.session.execute(
+        db.select(Reservation)
+        .options(
+            selectinload(Reservation.listing).selectinload(Listing.vendor),
+            selectinload(Reservation.rating),
+        )
+        .filter_by(id=reservation_id)
+    ).scalar_one_or_none()
+
+    # Verify reservation existence
+    if reservation is None:
+        abort(404)
+
+    # Restrict access to owning student
+    if reservation.student_id != current_user.id:
+        abort(403)
+
+    # Enforce eligibility guard so only picked up reservations can be rated
+    if reservation.status != "picked up":
+        flash("Only picked-up reservations can be rated.", "danger")
+        return redirect(url_for("student.my_reservations"))
+
+    # Prevent duplicate ratings for the same reservation
+    if reservation.rating is not None:
+        flash("You have already rated this reservation.", "danger")
+        return redirect(url_for("student.my_reservations"))
+
+    if request.method == "POST":
+        stars_raw = request.form.get("stars", "").strip()
+        comment = request.form.get("comment", "").strip()
+
+        # Validate star rating format and bounds
+        try:
+            stars = int(stars_raw)
+            if stars < 1 or stars > 5:
+                raise ValueError
+        except (ValueError, TypeError):
+            flash("Star rating must be an integer between 1 and 5.", "danger")
+            return render_template(
+                "student/rate.html",
+                reservation=reservation,
+                stars=stars_raw,
+                comment=comment,
+            )
+
+        # Validate comment length limit
+        if len(comment) > 300:
+            flash("Comment must not exceed 300 characters.", "danger")
+            return render_template(
+                "student/rate.html",
+                reservation=reservation,
+                stars=stars,
+                comment=comment,
+            )
+
+        # Persist rating record and handle concurrent duplicate race conditions
+        new_rating = Rating(
+            reservation_id=reservation.id,
+            stars=stars,
+            comment=comment if comment else None,
+        )
+
+        try:
+            db.session.add(new_rating)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash("You have already rated this reservation.", "danger")
+            return redirect(url_for("student.my_reservations"))
+
+        flash("Thank you for your rating!", "success")
+        return redirect(url_for("student.my_reservations"))
+
     return render_template(
-        "student/my_reservations.html",
-        reservations=reservations,
-        now=datetime.now(),
+        "student/rate.html",
+        reservation=reservation,
+        stars=None,
+        comment="",
     )
 
 
@@ -171,22 +287,32 @@ def cancel_reservation(reservation_id):
     if reservation.student_id != current_user.id:
         abort(403)
 
-    # Lock order is always listing first, the same as reserve_listing() and cancel_listing().
-    # The reservation row is locked later, by the UPDATE that commit() sends.
+    # Lock order is always listing first, then reservation: the same order reserve_listing(),
+    # cancel_listing() and confirm_pickup() use. Whichever request gets the listing lock
+    # finishes first, and the other one then sees its committed result.
     listing = db.session.execute(
-        db.select(Listing).filter_by(id=reservation.listing_id).with_for_update()
+        db.select(Listing)
+        .filter_by(id=reservation.listing_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).scalar_one()
 
-    # Re-read the reservation now that the listing is locked: another request may have
-    # cancelled it while this one was waiting for the lock
-    db.session.refresh(reservation)
+    # Re-read the reservation under its own row lock: a pickup or a vendor cancel may have
+    # changed it while this request was waiting, and the copy read above would be stale
+    reservation = db.session.execute(
+        db.select(Reservation)
+        .filter_by(id=reservation_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one()
 
-    if reservation.status != "active" or listing.pickup_end <= datetime.now():
+    if reservation.status != "active" or listing.has_ended():
         db.session.rollback()
         flash("This reservation can no longer be cancelled.", "danger")
         return redirect(url_for("student.my_reservations"))
 
     reservation.status = "cancelled"
+    reservation.cancellation_reason = "Cancelled by student"
     listing.remaining_portions += reservation.portions_reserved
     db.session.commit()
 
