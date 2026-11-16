@@ -1,4 +1,6 @@
+import os
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 import unittest
@@ -418,6 +420,80 @@ class ListingsTestCase(unittest.TestCase):
             b"Please provide valid dates and times for the pickup window",
             response.data,
         )
+
+    # Verify text longer than the database columns is rejected by the form, not by PostgreSQL
+    def test_post_listing_text_too_long(self):
+        self._create_and_login_user(
+            name="Long Text Vendor",
+            email="vendor_long@example.invalid",
+            password="VendorPass123!",
+            role="vendor",
+        )
+        start_time = datetime.now() + timedelta(hours=1)
+        end_time = datetime.now() + timedelta(hours=3)
+        base_form = {
+            "title": "Leftover Pizza",
+            "portions": "5",
+            "pickup_location": "Student Union",
+            "pickup_start": start_time.strftime("%Y-%m-%dT%H:%M"),
+            "pickup_end": end_time.strftime("%Y-%m-%dT%H:%M"),
+        }
+
+        response = self.client.post("/listings/new", data={**base_form, "title": "T" * 201})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Title must be 200 characters or fewer.", response.data)
+
+        response = self.client.post(
+            "/listings/new", data={**base_form, "pickup_location": "L" * 256}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Pickup Location must be 255 characters or fewer.", response.data)
+
+        with self.app.app_context():
+            self.assertEqual(db.session.execute(db.select(Listing)).scalars().all(), [])
+
+        # The longest allowed values are accepted
+        response = self.client.post(
+            "/listings/new",
+            data={**base_form, "title": "T" * 200, "pickup_location": "L" * 255},
+        )
+        self.assertEqual(response.status_code, 302)
+
+    # Verify a pickup date too far out of range to convert is a form error, not a crash
+    @unittest.skipUnless(hasattr(time, "tzset"), "needs time.tzset (not available on Windows)")
+    def test_post_listing_out_of_range_year(self):
+        # 11 PM on the last day of year 9999 in Denver is already year 10000 in UTC
+        original_tz = os.environ.get("TZ")
+
+        def restore_timezone():
+            if original_tz is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = original_tz
+            time.tzset()
+
+        os.environ["TZ"] = "America/Denver"
+        time.tzset()
+        self.addCleanup(restore_timezone)
+
+        self._create_and_login_user(
+            name="Far Future Vendor",
+            email="vendor_far@example.invalid",
+            password="VendorPass123!",
+            role="vendor",
+        )
+        response = self.client.post(
+            "/listings/new",
+            data={
+                "title": "Leftover Pizza",
+                "portions": "5",
+                "pickup_location": "Student Union",
+                "pickup_start": "9999-12-31T22:00",
+                "pickup_end": "9999-12-31T23:00",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Please provide valid dates and times for the pickup window.", response.data)
 
 
 if __name__ == "__main__":

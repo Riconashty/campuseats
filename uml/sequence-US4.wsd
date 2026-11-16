@@ -1,0 +1,75 @@
+@startuml US4
+
+title US4: Reserve portions
+
+autonumber
+
+actor Student
+participant Browser
+participant "student routes\n(Flask)" as Route
+participant "Listing model\n(SQLAlchemy)" as ListingModel
+participant "Reservation model\n(SQLAlchemy)" as ReservationModel
+database PostgreSQL as DB
+
+Student -> Browser : choose 1 or 2 portions on a listing card;\nclick "Reserve"
+Browser -> Route : POST /listings/<id>/reserve\n(portions)
+
+alt not logged in as a student
+    Route --> Browser : 403 Forbidden
+else portions is not 1 or 2
+    Route --> Browser : 302 redirect to /listings\n"Please select either 1 or 2 portions to reserve."
+else request is valid
+    Route -> ListingModel : load the listing and lock it
+    ListingModel -> DB : SELECT * FROM listings\nWHERE id = ? FOR UPDATE
+    note right of DB
+      The row lock is what makes AC4 hold. If two
+      students reserve at the same moment, the
+      second request waits here until the first
+      commits, then reads the updated
+      remaining_portions.
+    end note
+    DB --> ListingModel : listing row (locked)
+    ListingModel --> Route : Listing or None
+
+    alt listing is missing, cancelled, or its pickup window has ended
+        Route -> DB : ROLLBACK
+        Route --> Browser : 302 redirect to /listings\n"This listing is no longer available for reservation."
+    else listing is available
+        Route -> ReservationModel : find this student's active\nreservation for the listing
+        ReservationModel -> DB : SELECT * FROM reservations\nWHERE student_id = ? AND listing_id = ?\nAND status = 'active'
+        DB --> ReservationModel : matching row or nothing
+        ReservationModel --> Route : Reservation or None
+
+        alt student already holds an active reservation (AC3)
+            Route -> DB : ROLLBACK
+            Route --> Browser : 302 redirect to /listings\n"You already have an active reservation for this listing."
+        else remaining_portions < portions requested (AC2)
+            Route -> DB : ROLLBACK
+            Route --> Browser : 302 redirect to /listings\n"Not enough portions remaining to fulfill your request."
+            note right of Route : no reservation is created and\nremaining_portions is unchanged
+        else enough portions remain (AC1)
+            Route -> ReservationModel : generate_unique_pickup_code()
+            loop until an unused code is found
+                ReservationModel -> DB : SELECT id FROM reservations\nWHERE pickup_code = ?
+                DB --> ReservationModel : matching row or nothing
+            end
+            ReservationModel --> Route : 6-character code
+            Route -> ListingModel : remaining_portions -= portions
+            Route -> ReservationModel : Reservation(student, listing,\nportions, code, status = active)
+            ReservationModel -> DB : INSERT INTO reservations (...)
+            ListingModel -> DB : UPDATE listings\nSET remaining_portions = ?
+            Route -> DB : COMMIT
+            note right of DB : the commit releases the row lock
+            Route -> Route : remember the new reservation id\nin the session
+            Route --> Browser : 302 redirect to /listings\n"Reservation confirmed!"
+            Browser -> Route : GET /listings
+            Route -> ReservationModel : load the reservation just made
+            ReservationModel -> DB : SELECT * FROM reservations WHERE id = ?
+            DB --> ReservationModel : reservation row
+            Route --> Browser : 200 listings page with the pickup code modal\nand the lower "portions left" count
+            Browser --> Student : shows the 6-character pickup code
+        end
+    end
+end
+
+@enduml

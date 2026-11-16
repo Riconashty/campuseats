@@ -204,6 +204,28 @@ class RegistrationTestCase(unittest.TestCase):
 
             self.assertIsNone(user)
 
+    # Verifies values longer than the database columns are rejected by the form.
+    def test_overlong_name_or_email_registration(self):
+        long_email = "e" * 250 + "@x.edu"
+        for name, email, message in (
+            ("N" * 121, "long_name@example.invalid", b"Name must be 120 characters or fewer."),
+            ("Normal Name", long_email, b"Email must be 255 characters or fewer."),
+        ):
+            response = self.client.post(
+                "/register",
+                data={
+                    "name": name,
+                    "email": email,
+                    "password": "TestPassword123!",
+                    "role": "student",
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(message, response.data)
+
+        with self.app.app_context():
+            self.assertEqual(db.session.execute(db.select(User)).scalars().all(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

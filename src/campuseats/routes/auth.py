@@ -8,6 +8,11 @@ from flask_login import login_user, logout_user, login_required, current_user
 
 auth_bp = Blueprint("auth", __name__)
 
+# Longest values the users table accepts, read from the model so the form rules and the
+# database columns cannot drift apart. PostgreSQL rejects longer values with an error.
+MAX_NAME_LENGTH = User.name.type.length
+MAX_EMAIL_LENGTH = User.email.type.length
+
 
 # Registration page
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -27,6 +32,15 @@ def register():
             if not value:
                 flash(f"Please complete all required fields. Missing: {field_name}.", "danger")
                 return render_template("register.html")
+
+        # Validate field lengths against the database column limits
+        if len(name) > MAX_NAME_LENGTH:
+            flash(f"Name must be {MAX_NAME_LENGTH} characters or fewer.", "danger")
+            return render_template("register.html")
+
+        if len(email) > MAX_EMAIL_LENGTH:
+            flash(f"Email must be {MAX_EMAIL_LENGTH} characters or fewer.", "danger")
+            return render_template("register.html")
 
         # Validate password length
         if len(password) < 8:

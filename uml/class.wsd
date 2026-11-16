@@ -1,58 +1,114 @@
 @startuml class
 
-class User {
-    email : str
+title CampusEats domain model
+
+' Each class below is one PostgreSQL table, named in its stereotype.
+' Attribute names match the SQLAlchemy models in src/campuseats/models.
+
+class User <<users>> {
+    id : int
     name : str
-    creation_date: datetime
-    role : str
+    email : str {unique}
     password_hash : str
-    active : bool
+    role : str
+    created_at : datetime
 }
 
-class Student
-class Vendor 
+class Student <<role = "student">>
+class Vendor <<role = "vendor">>
 
 User <|-- Student
 User <|-- Vendor
 
-class Listing {
+note right of User
+  Student and Vendor are not separate tables.
+  Both are rows in **users**, told apart by
+  **role**; the role decides which pages a
+  user may open (routes/role_guards.py).
+end note
+
+class Listing <<listings>> {
     id : int
-    vendor_id : int
+    vendor_id : int <<FK users.id>>
     title : str
-    description : str
-    portion_total : int
-    portion_remaining : int
+    description : str [0..1]
+    total_portions : int
+    remaining_portions : int
     pickup_location : str
     pickup_start : datetime
     pickup_end : datetime
-    cancelled : bool
-}
-class Reservation {
-    id : int
-    student_id : int
-    listing_id : int
-    portions_reserved: int
-    pickup_code : str
-    status : ReservationStatus
+    status : ListingStatus
     created_at : datetime
+    --
+    /reserved_portions : int
+    /display_status : str
+    has_ended() : bool
+}
+
+enum ListingStatus {
+    active
+    cancelled
+}
+
+note bottom of ListingStatus
+  **ended** is not stored. A listing is shown as
+  ended when status is active and pickup_end
+  has passed (Listing.display_status).
+end note
+
+class Reservation <<reservations>> {
+    id : int
+    student_id : int <<FK users.id>>
+    listing_id : int <<FK listings.id>>
+    portions_reserved : int {1..2}
+    pickup_code : str {unique, 6 characters}
+    status : ReservationStatus
+    cancellation_reason : str [0..1]
+    created_at : datetime
+    --
+    /display_status : str
 }
 
 enum ReservationStatus {
-    ACTIVE
-    PICKED_UP
-    CANCELLED
-    NO_SHOW
+    active
+    picked up
+    cancelled
+    no-show
 }
 
-class DietaryTag {
+note bottom of ReservationStatus
+  An active reservation is shown as **no-show**
+  once its listing's pickup window has ended
+  (Reservation.display_status), and is stored
+  as no-show when its code is entered late.
+end note
+
+class Rating <<ratings>> {
     id : int
-    name : str
+    reservation_id : int <<FK reservations.id>> {unique}
+    stars : int {1..5}
+    comment : str [0..1] {max 300 characters}
+    created_at : datetime
 }
 
-Vendor "1" -- "0..*" Listing : posts
-Student "1" *-- "N" Reservation : makes
-Listing "1" -- "0..*" Reservation : reserved through
-Listing "N" -- "N" DietaryTag : tagged with
+class DietaryTag <<dietary_tags>> {
+    id : int
+    name : str {unique}
+}
+
+note bottom of DietaryTag
+  vegetarian, vegan, gluten-free,
+  halal, contains nuts.
+  The link to Listing is the join table
+  **listing_dietary_tags**.
+end note
+
+Vendor "1" -- "0..*" Listing : posts >
+Student "1" -- "0..*" Reservation : makes >
+Listing "1" *-- "0..*" Reservation : is reserved through >
+Listing "0..*" -- "0..*" DietaryTag : is tagged with >
+Reservation "1" -- "0..1" Rating : is rated by >
+Listing ..> ListingStatus
 Reservation ..> ReservationStatus
 
 @enduml
