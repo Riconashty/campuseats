@@ -13,10 +13,9 @@ they are re-tested after a fix.
 
 | | |
 | --- | --- |
-| Build tested (commit or tag) | |
 | Started with | `docker compose down -v` then `docker compose up --build` |
 | Address | http://localhost:5000 |
-| Browser | |
+| Browser | Chrome |
 
 | User story | Acceptance criterion | Tester | Date | Result | Notes |
 | --- | --- | --- | --- | --- | --- |
